@@ -58,11 +58,48 @@ const SUBTITLE_STYLES = [
     preview: 'Nenhuma legenda. Foco total nas imagens e na voz.' },
 ]
 
+// ========== FORMATOS DE CONTEUDO ==========
+const CONTENT_FORMATS = [
+  { id: 'short_news', label: 'Noticia Curta', emoji: '📰', color: 'from-red-500/20 to-orange-500/10',
+    desc: 'Breaking news, fatos rapidos',
+    defaults: { mood: 'urgente', voice: 'pt-BR-AntonioNeural', duration: 30, subtitle_style: 'word_by_word' } },
+  { id: 'deep_analysis', label: 'Analise', emoji: '🔍', color: 'from-blue-500/20 to-cyan-500/10',
+    desc: 'Contexto, dados, opiniao',
+    defaults: { mood: 'informativo', voice: 'pt-BR-FranciscaNeural', duration: 90, subtitle_style: 'sentence' } },
+  { id: 'horror_tale', label: 'Conto de Terror', emoji: '👻', color: 'from-purple-900/30 to-gray-900/20',
+    desc: 'Historias sombrias, suspense, medo',
+    defaults: { mood: 'emocional', voice: 'pt-BR-AntonioNeural', duration: 180, subtitle_style: 'word_by_word' } },
+  { id: 'sleep_story', label: 'Historia pra Dormir', emoji: '🌙', color: 'from-indigo-900/30 to-blue-900/20',
+    desc: 'Narracao calma, relaxante, ASMR',
+    defaults: { mood: 'emocional', voice: 'pt-BR-FranciscaNeural', duration: 300, subtitle_style: 'none' } },
+  { id: 'city_doc', label: 'Documentario', emoji: '🏘️', color: 'from-emerald-800/20 to-teal-900/10',
+    desc: 'Cidades, lugares, historias reais pouco conhecidas',
+    defaults: { mood: 'informativo', voice: 'pt-BR-AntonioNeural', duration: 180, subtitle_style: 'sentence' } },
+  { id: 'conspiracy', label: 'Misterio / Teoria', emoji: '🔮', color: 'from-violet-900/30 to-purple-900/20',
+    desc: 'Teorias, misterios nao resolvidos, conspiracao',
+    defaults: { mood: 'impactante', voice: 'pt-BR-AntonioNeural', duration: 120, subtitle_style: 'highlight' } },
+  { id: 'fake_story', label: 'Historia Fake', emoji: '🎭', color: 'from-amber-800/20 to-yellow-900/10',
+    desc: 'Ficcao que parece real, satira, humor negro',
+    defaults: { mood: 'polemico', voice: 'pt-BR-ThalitaNeural', duration: 60, subtitle_style: 'word_by_word' } },
+  { id: 'top_list', label: 'Top / Ranking', emoji: '🏆', color: 'from-yellow-600/20 to-amber-900/10',
+    desc: 'Top 5, top 10, listas, curiosidades',
+    defaults: { mood: 'empolgante', voice: 'pt-BR-ThalitaNeural', duration: 90, subtitle_style: 'highlight' } },
+  { id: 'motivation', label: 'Motivacional', emoji: '💪', color: 'from-orange-600/20 to-red-900/10',
+    desc: 'Frases, reflexoes, superacao',
+    defaults: { mood: 'emocional', voice: 'pt-BR-AntonioNeural', duration: 60, subtitle_style: 'word_by_word' } },
+  { id: 'sports_clip', label: 'Esporte', emoji: '⚽', color: 'from-green-600/20 to-emerald-900/10',
+    desc: 'Gols, lances, polemicas, destaques',
+    defaults: { mood: 'empolgante', voice: 'pt-BR-AntonioNeural', duration: 30, subtitle_style: 'word_by_word' } },
+]
+
 const DURATIONS = [
-  { value: 15, label: '15s', desc: 'Ultra curto', bar: 'w-1/5' },
-  { value: 30, label: '30s', desc: 'Short ideal', bar: 'w-2/5' },
-  { value: 60, label: '60s', desc: 'Padrao', bar: 'w-3/5' },
-  { value: 90, label: '90s', desc: 'Detalhado', bar: 'w-4/5' },
+  { value: 15, label: '15s', desc: 'Ultra curto', bar: 'w-[8%]' },
+  { value: 30, label: '30s', desc: 'Short ideal', bar: 'w-[16%]' },
+  { value: 60, label: '1min', desc: 'Padrao', bar: 'w-[32%]' },
+  { value: 90, label: '1:30', desc: 'Detalhado', bar: 'w-[48%]' },
+  { value: 180, label: '3min', desc: 'Historia curta', bar: 'w-[64%]' },
+  { value: 300, label: '5min', desc: 'Documentario', bar: 'w-[80%]' },
+  { value: 600, label: '10min', desc: 'Historia longa', bar: 'w-full' },
   { value: 120, label: '2min', desc: 'Longo', bar: 'w-full' },
 ]
 
@@ -292,7 +329,7 @@ export default function StudioView() {
 
   const [brief, setBrief] = useState({
     mode: 'topic', topic_query: '', custom_text: '', source: '',
-    mood: 'urgente', visual_style: 'news', subtitle_style: 'word_by_word',
+    format: null, mood: 'urgente', visual_style: 'news', subtitle_style: 'word_by_word',
     voice: 'pt-BR-AntonioNeural', music: true, duration: 30,
     platform: 'tiktok', template_id: null, extra_instructions: '',
   })
@@ -369,6 +406,32 @@ export default function StudioView() {
           </div>
         )}
       </Card>
+
+      {/* ===== FORMATO DE CONTEUDO ===== */}
+      <Section icon={Sparkles} title="Formato de Conteudo">
+        <p className="text-[9px] text-content-4 mb-2">Escolha o tipo e todas as configuracoes se ajustam automaticamente.</p>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+          {CONTENT_FORMATS.map(f => (
+            <button key={f.id}
+              onClick={() => {
+                set('format', f.id)
+                set('mood', f.defaults.mood)
+                set('voice', f.defaults.voice)
+                set('duration', f.defaults.duration)
+                set('subtitle_style', f.defaults.subtitle_style)
+              }}
+              className={`p-2.5 rounded-xl border text-left transition-all ${
+                brief.format === f.id
+                  ? `bg-gradient-to-br ${f.color} border-accent/30 ring-1 ring-accent/20`
+                  : 'border-stroke-1 bg-surface-3/10 hover:border-stroke-2 hover:bg-surface-3/20'
+              }`}>
+              <span className="text-lg block mb-1">{f.emoji}</span>
+              <span className="text-[10px] font-bold text-content-1 block leading-tight">{f.label}</span>
+              <span className="text-[8px] text-content-4 leading-snug block mt-0.5">{f.desc}</span>
+            </button>
+          ))}
+        </div>
+      </Section>
 
       {/* ===== MOOD — com preview ===== */}
       <Section icon={Palette} title="Sentimento / Tom">
@@ -552,13 +615,14 @@ export default function StudioView() {
       {/* ===== RESUMO + GERAR ===== */}
       <Card glow>
         <CardHeader icon={Eye} title="Resumo da criacao" />
-        <div className="grid grid-cols-5 gap-2 mb-4">
+        <div className="grid grid-cols-6 gap-2 mb-4">
           {[
+            { l: 'Tipo', v: CONTENT_FORMATS.find(f => f.id === brief.format)?.emoji + ' ' + (CONTENT_FORMATS.find(f => f.id === brief.format)?.label || 'Custom') },
             { l: 'Tom', v: selectedMood?.emoji + ' ' + (selectedMood?.label || '') },
             { l: 'Voz', v: selectedVoice?.emoji + ' ' + (selectedVoice?.label || '') },
-            { l: 'Visual', v: selectedVisual?.icon + ' ' + (selectedVisual?.label || '') },
+            { l: 'Layout', v: selectedVisual?.icon + ' ' + (selectedVisual?.label || '') },
             { l: 'Legenda', v: selectedSub?.icon + ' ' + (selectedSub?.label || '') },
-            { l: 'Formato', v: `${brief.duration}s · ${brief.platform}` },
+            { l: 'Duracao', v: `${brief.duration >= 60 ? Math.floor(brief.duration/60) + 'min' : brief.duration + 's'} · ${brief.platform}` },
           ].map(({ l, v }) => (
             <div key={l} className="bg-surface-3/50 rounded-lg p-2 text-center">
               <p className="text-[8px] text-content-4 uppercase tracking-wider">{l}</p>
