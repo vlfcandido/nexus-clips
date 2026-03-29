@@ -78,9 +78,9 @@ async def generate_narrated_video(
     duration = await _audio_duration(voice_path)
     log.info("video_builder.duration", seconds=round(duration, 1))
 
-    # === 3. Imagens do contexto ===
+    # === 3. Imagens do contexto (IA gera queries específicas) ===
     num_images = max(4, int(duration / SECONDS_PER_IMAGE))
-    images = await _fetch_images(topic, title, img_dir, count=min(num_images, 8))
+    images = await _fetch_images(topic, title, img_dir, count=min(num_images, 8), summary=summary)
     log.info("video_builder.images", count=len(images), needed=num_images)
 
     # === 4. Montar vídeo ===
@@ -98,22 +98,40 @@ async def generate_narrated_video(
 # ==================== TTS ====================
 
 async def _edge_tts(text: str, out: str, voice: str, rate: str) -> bool:
+    """Edge TTS via subprocess — arquivo temp pra texto e script."""
     try:
-        script = (
-            "import asyncio, edge_tts\n"
+        import tempfile
+
+        # Arquivo com o texto
+        txt_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
+        txt_file.write(text)
+        txt_file.close()
+
+        # Script Python separado
+        script_file = tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8')
+        script_file.write(
+            "import asyncio, edge_tts, pathlib\n"
             "async def g():\n"
-            f"    c = edge_tts.Communicate({repr(text)}, {repr(voice)}, rate={repr(rate)})\n"
-            f"    await c.save({repr(out)})\n"
+            f"    t = pathlib.Path(r'{txt_file.name}').read_text(encoding='utf-8')\n"
+            f"    c = edge_tts.Communicate(t, '{voice}', rate='{rate}')\n"
+            f"    await c.save(r'{out}')\n"
             "asyncio.run(g())\n"
         )
+        script_file.close()
+
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-c", script,
+            sys.executable, script_file.name,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         )
         _, stderr = await proc.communicate()
+
+        Path(txt_file.name).unlink(missing_ok=True)
+        Path(script_file.name).unlink(missing_ok=True)
+
         if proc.returncode != 0 or not Path(out).exists() or Path(out).stat().st_size < 100:
-            log.error("tts.edge_fail", err=stderr.decode()[:150])
+            log.error("tts.edge_fail", err=stderr.decode()[:200])
             return False
+
         log.info("tts.edge_ok", size=Path(out).stat().st_size)
         return True
     except Exception as e:
@@ -135,19 +153,45 @@ async def _gtts_fallback(text: str, out: str) -> bool:
 
 # ==================== IMAGES ====================
 
-async def _fetch_images(topic: str, title: str, out_dir: Path, count: int = 6) -> list[str]:
-    """Busca imagens portrait do Pexels por keywords do tópico + título."""
+async def _generate_image_queries(title: str, summary: str, topic: str) -> list[str]:
+    """Usa IA pra gerar queries de busca de imagem específicas pro conteúdo."""
+    try:
+        from config.llm import llm_json
+        data = await llm_json(
+            system="Generate 4 specific image search queries for stock photos. Return JSON.",
+            user=f"""News: {title}. {summary}
+Topic: {topic}
+
+Generate 4 SPECIFIC image search queries to find relevant stock photos.
+Be specific to the actual event, people, places mentioned.
+Example: if news is about "US Marines in Middle East", queries should be:
+"US Marines military ship", "Middle East desert troops", "Iran military", "naval fleet ocean"
+
+NOT generic like "war" or "military".
+
+Return JSON: {{"queries": ["query1", "query2", "query3", "query4"]}}""",
+            temperature=0.3,
+            max_tokens=150,
+        )
+        queries = data.get("queries", [])
+        log.info("image_queries.generated", queries=queries)
+        return queries[:4]
+    except Exception as e:
+        log.warning("image_queries.error", error=str(e))
+        # Fallback: extrai palavras-chave do título
+        words = [w for w in title.split() if len(w) > 3]
+        return [" ".join(words[:3]), topic]
+
+
+async def _fetch_images(topic: str, title: str, out_dir: Path, count: int = 6, summary: str = "") -> list[str]:
+    """Busca imagens portrait do Pexels com queries específicas geradas por IA."""
     api_key = settings.pexels_api_key
     if not api_key:
         log.warning("pexels.no_key")
         return []
 
-    style = TOPIC_STYLE.get(topic, TOPIC_STYLE["guerra"])
-    # Monta 2 queries: keywords do tópico + palavras do título
-    queries = [
-        " ".join(style["keywords"][:3]),
-        " ".join(title.split()[:4]),
-    ]
+    # Gera queries específicas pro conteúdo usando IA
+    queries = await _generate_image_queries(title, summary, topic)
 
     paths = []
     try:
