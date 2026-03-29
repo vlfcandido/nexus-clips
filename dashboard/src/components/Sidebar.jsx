@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Film, Radio, TrendingUp, Settings, Sparkles, Pause, Play,
-  Users, BarChart3, MessageSquare, Wand2, ChevronRight,
+  Users, BarChart3, MessageSquare, Wand2, ChevronRight, Layout,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { pausePipeline, resumePipeline } from '../api/client'
@@ -31,6 +31,7 @@ const NAV_GROUPS = [
   {
     label: 'Admin',
     items: [
+      { id: 'templates', label: 'Templates', icon: Layout },
       { id: 'prompts', label: 'Prompts IA', icon: MessageSquare },
       { id: 'settings', label: 'Config', icon: Settings },
     ],

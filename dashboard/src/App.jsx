@@ -7,6 +7,7 @@ import TrendingView from './components/TrendingView'
 import AccountsView from './components/AccountsView'
 import AnalyticsView from './components/AnalyticsView'
 import StudioView from './components/StudioView'
+import TemplatesView from './components/TemplatesView'
 import PromptsView from './components/PromptsView'
 import SettingsView from './components/SettingsView'
 
@@ -18,6 +19,7 @@ const PAGES = {
   trending: TrendingView,
   accounts: AccountsView,
   analytics: AnalyticsView,
+  templates: TemplatesView,
   prompts: PromptsView,
   settings: SettingsView,
 }

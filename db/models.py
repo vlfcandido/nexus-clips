@@ -234,6 +234,92 @@ class Clip(Base):
     shares: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class VideoTemplate(Base):
+    """Templates visuais editáveis — layout do vídeo (barras, títulos, posições)."""
+
+    __tablename__ = "video_templates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    updated_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow, onupdate=dt.datetime.utcnow)
+
+    name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str] = mapped_column(Text, default="")
+    category: Mapped[str] = mapped_column(String(30), default="news")  # news, tiktok, cinematic, minimal
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Layout config (JSON) — gerado por IA ou editado manualmente
+    layout_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+# Templates visuais padrão
+DEFAULT_TEMPLATES = [
+    {
+        "name": "Breaking News",
+        "description": "Barra preta no topo com titulo, badge URGENTE vermelho, barra de progresso, fonte no bottom",
+        "category": "news",
+        "is_default": True,
+        "layout_json": """{
+    "elements": [
+        {"type": "bar", "position": "top", "height": 5, "color": "#ef4444"},
+        {"type": "overlay", "position": "top", "height": 400, "color": "black", "opacity": 0.65},
+        {"type": "badge", "text": "URGENTE", "x": 50, "y": 60, "color": "#ef4444", "size": 28},
+        {"type": "separator", "x": 50, "y": 98, "width": 90, "height": 3, "color": "#ef4444"},
+        {"type": "title", "x": 50, "y": 130, "size": 44, "color": "white", "max_chars": 70},
+        {"type": "overlay", "position": "center", "y": 700, "height": 350, "color": "black", "opacity": 0.5, "show_after": 1.5},
+        {"type": "summary", "x": 50, "y": 740, "size": 28, "color": "#e8e8e8", "line_spacing": 14, "show_after": 1.5},
+        {"type": "overlay", "position": "bottom", "height": 100, "color": "black", "opacity": 0.75},
+        {"type": "progress_bar", "position": "bottom", "height": 4, "color": "#ef4444"},
+        {"type": "source", "x": 50, "y": 1850, "size": 18, "color": "#999999"},
+        {"type": "branding", "text": "NEXUS CLIPS", "x": 880, "y": 1852, "size": 14, "color": "#555555"}
+    ]
+}""",
+    },
+    {
+        "name": "TikTok Viral",
+        "description": "Texto grande central, fundo escuro minimo, foco na legenda word-by-word",
+        "category": "tiktok",
+        "is_default": False,
+        "layout_json": """{
+    "elements": [
+        {"type": "overlay", "position": "top", "height": 300, "color": "black", "opacity": 0.4},
+        {"type": "title", "x": 50, "y": 100, "size": 52, "color": "white", "max_chars": 50, "bold": true},
+        {"type": "overlay", "position": "bottom", "height": 200, "color": "black", "opacity": 0.6},
+        {"type": "source", "x": 50, "y": 1800, "size": 20, "color": "#cccccc"},
+        {"type": "progress_bar", "position": "bottom", "height": 3, "color": "#818cf8"}
+    ]
+}""",
+    },
+    {
+        "name": "Cinematic",
+        "description": "Imagens grandes, texto minimo, barras finas em cima e embaixo (letterbox)",
+        "category": "cinematic",
+        "is_default": False,
+        "layout_json": """{
+    "elements": [
+        {"type": "letterbox", "height": 120, "color": "black"},
+        {"type": "overlay", "position": "bottom", "height": 250, "color": "black", "opacity": 0.7},
+        {"type": "title", "x": 50, "y": 1700, "size": 36, "color": "white", "max_chars": 60},
+        {"type": "source", "x": 50, "y": 1760, "size": 16, "color": "#888888"}
+    ]
+}""",
+    },
+    {
+        "name": "Minimal",
+        "description": "Fundo limpo, apenas titulo e fonte, sem barras",
+        "category": "minimal",
+        "is_default": False,
+        "layout_json": """{
+    "elements": [
+        {"type": "overlay", "position": "center", "y": 800, "height": 300, "color": "black", "opacity": 0.4},
+        {"type": "title", "x": 80, "y": 880, "size": 38, "color": "white", "max_chars": 55},
+        {"type": "source", "x": 80, "y": 1000, "size": 18, "color": "#aaaaaa"}
+    ]
+}""",
+    },
+]
+
+
 class ClipComment(Base):
     """Comentários/feedback em clips — historico do que ficou bom/ruim."""
 

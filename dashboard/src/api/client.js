@@ -24,6 +24,11 @@ export const generateClip = (data) => request('/clips/generate', { method: 'POST
 export const getClipComments = (id) => request(`/clips/${id}/comments`)
 export const addClipComment = (id, data) => request(`/clips/${id}/comments`, { method: 'POST', body: JSON.stringify(data) })
 export const cloneClip = (id, adjustments = '') => request(`/clips/${id}/clone`, { method: 'POST', body: JSON.stringify({ adjustments }) })
+
+// Templates visuais
+export const getTemplates = () => request('/templates')
+export const updateTemplate = (id, data) => request(`/templates/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+export const createTemplateFromNatural = (instruction, baseId = null) => request('/templates/from-natural', { method: 'POST', body: JSON.stringify({ instruction, base_template_id: baseId }) })
 export const deleteClip = (id) => request(`/clips/${id}`, { method: 'DELETE' })
 
 // Sources

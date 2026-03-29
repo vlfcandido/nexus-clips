@@ -31,6 +31,16 @@ async def init_db():
                 session.add(PromptTemplate(**p))
         await session.commit()
 
+    # Seed templates visuais
+    from db.models import DEFAULT_TEMPLATES, VideoTemplate
+    async with async_session() as session:
+        existing = await session.execute(select(VideoTemplate.name))
+        existing_names = {r[0] for r in existing.all()}
+        for t in DEFAULT_TEMPLATES:
+            if t["name"] not in existing_names:
+                session.add(VideoTemplate(**t))
+        await session.commit()
+
     # Seed fontes padrão
     from db.models import MonitoredSource
     async with async_session() as session:

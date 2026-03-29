@@ -15,7 +15,7 @@ from sqlalchemy import desc, func, select, update
 from config.logging import setup_logging
 from config.settings import settings
 from db.database import async_session, init_db
-from db.models import Clip, ClipComment, MonitoredSource, PublishAccount, PublishLog, PromptTemplate
+from db.models import Clip, ClipComment, MonitoredSource, PublishAccount, PublishLog, PromptTemplate, VideoTemplate
 from detection.trending import get_all_trends
 from pipeline import Pipeline
 from strategy.scheduler import get_analytics_summary
@@ -1255,3 +1255,108 @@ JSON: {{"adjusted_text": "texto reescrito", "changes_made": "o que foi mudado"}}
         notify_sse("new_clip", {"clip_id": new_id})
         return {"status": "ok", "new_clip_id": new_id, "adjustments_applied": data.adjustments}
     return {"status": "error", "error": "Falha ao gerar clone"}
+
+
+# ==================== VIDEO TEMPLATES ====================
+
+@app.get("/api/templates")
+async def list_templates():
+    """Lista templates visuais."""
+    async with async_session() as session:
+        result = await session.execute(select(VideoTemplate).order_by(VideoTemplate.id))
+        templates = result.scalars().all()
+    return {"templates": [
+        {"id": t.id, "name": t.name, "description": t.description, "category": t.category,
+         "is_default": t.is_default, "active": t.active, "layout_json": t.layout_json,
+         "updated_at": t.updated_at.isoformat() if t.updated_at else ""}
+        for t in templates
+    ]}
+
+
+class TemplateUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    layout_json: str | None = None
+    is_default: bool | None = None
+    active: bool | None = None
+
+
+@app.patch("/api/templates/{template_id}")
+async def update_template(template_id: int, data: TemplateUpdate):
+    async with async_session() as session:
+        t = await session.get(VideoTemplate, template_id)
+        if not t: raise HTTPException(404)
+        if data.name is not None: t.name = data.name
+        if data.description is not None: t.description = data.description
+        if data.layout_json is not None: t.layout_json = data.layout_json
+        if data.is_default is not None:
+            if data.is_default:
+                await session.execute(select(VideoTemplate).where(VideoTemplate.is_default == True))
+                for old in (await session.execute(select(VideoTemplate).where(VideoTemplate.is_default == True))).scalars():
+                    old.is_default = False
+            t.is_default = data.is_default
+        if data.active is not None: t.active = data.active
+        await session.commit()
+    return {"status": "updated"}
+
+
+class NaturalLayoutRequest(BaseModel):
+    instruction: str  # "adicione uma barra preta com titulo no topo"
+    base_template_id: int | None = None
+
+
+@app.post("/api/templates/from-natural")
+async def create_template_from_natural(data: NaturalLayoutRequest):
+    """IA converte linguagem natural em template visual JSON."""
+    from config.llm import llm_json
+
+    base_layout = "{}"
+    if data.base_template_id:
+        async with async_session() as session:
+            base = await session.get(VideoTemplate, data.base_template_id)
+            if base: base_layout = base.layout_json
+
+    result = await llm_json(
+        system="""Voce converte instrucoes de layout visual em JSON de template de video.
+O video e vertical 1080x1920. Responda APENAS em JSON.
+
+Elementos disponveis:
+- bar: barra colorida (position: top/bottom, height, color)
+- overlay: retangulo semi-transparente (position: top/center/bottom, height, color, opacity, y, show_after)
+- badge: texto pequeno com cor (text, x, y, color, size)
+- separator: linha horizontal (x, y, width, height, color)
+- title: titulo principal (x, y, size, color, max_chars, bold)
+- summary: texto do resumo (x, y, size, color, line_spacing, show_after)
+- source: fonte/credito (x, y, size, color)
+- branding: marca (text, x, y, size, color)
+- progress_bar: barra de progresso animada (position: bottom, height, color)
+- letterbox: barras pretas em cima e embaixo (height, color)""",
+        user=f"""Instrucao do usuario: {data.instruction}
+
+Template base atual:
+{base_layout}
+
+Gere o JSON do template visual. Mantenha os elementos do template base e aplique as mudancas pedidas.
+
+JSON: {{
+    "name": "nome descritivo do template",
+    "description": "descricao do que o usuario pediu",
+    "elements": [...]
+}}""",
+        temperature=0.3,
+        max_tokens=800,
+    )
+
+    # Salva no DB
+    async with async_session() as session:
+        t = VideoTemplate(
+            name=result.get("name", "Custom"),
+            description=result.get("description", data.instruction),
+            category="custom",
+            layout_json=json.dumps({"elements": result.get("elements", [])}),
+        )
+        session.add(t)
+        await session.commit()
+        template_id = t.id
+
+    return {"status": "ok", "template_id": template_id, "template": result}
