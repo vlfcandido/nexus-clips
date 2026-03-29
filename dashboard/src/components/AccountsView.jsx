@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Users, Plus, Trash2, X, ToggleLeft, ToggleRight, Eye, Film, ExternalLink, Shield, Check, Wifi, Loader2, RefreshCw, HelpCircle, Sparkles } from 'lucide-react'
-import { getAccounts, createAccount, updateAccount, deleteAccount, verifyAccount, syncAccount, diagnoseAccount } from '../api/client'
+import { Users, Plus, Trash2, X, ToggleLeft, ToggleRight, Eye, Film, ExternalLink, Shield, Check, Wifi, Loader2, RefreshCw, HelpCircle, Sparkles, Key } from 'lucide-react'
+import { getAccounts, createAccount, updateAccount, deleteAccount, verifyAccount, syncAccount, diagnoseAccount, getYouTubeAuthUrl } from '../api/client'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
 import Card, { CardHeader } from './ui/Card'
@@ -156,45 +156,51 @@ export default function AccountsView() {
             </div>
           </div>
 
-          {/* ===== YOUTUBE ===== */}
+          {/* ===== YOUTUBE (OAuth2 completo) ===== */}
           {form.platform === 'youtube' && (
             <div className="mb-4 space-y-3">
               <div className="p-4 bg-danger-muted/30 border border-danger/10 rounded-xl">
-                <p className="text-xs font-semibold text-danger mb-3 flex items-center gap-1.5">▶️ Conectar YouTube</p>
+                <p className="text-xs font-semibold text-danger mb-3 flex items-center gap-1.5">▶️ Conectar YouTube (Upload de videos)</p>
                 <div className="space-y-3">
                   <div className="flex gap-3">
                     <div className="w-6 h-6 rounded-full bg-surface-4 flex items-center justify-center text-[10px] font-bold text-content-2 flex-shrink-0 mt-0.5">1</div>
                     <div>
                       <p className="text-[11px] text-content-1 font-medium">Acesse o Google Cloud Console</p>
-                      <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="text-[10px] text-accent-light hover:underline">console.cloud.google.com/apis/credentials ↗</a>
+                      <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" className="text-[10px] text-accent-light hover:underline">Ativar YouTube Data API v3 ↗</a>
                     </div>
                   </div>
                   <div className="flex gap-3">
                     <div className="w-6 h-6 rounded-full bg-surface-4 flex items-center justify-center text-[10px] font-bold text-content-2 flex-shrink-0 mt-0.5">2</div>
                     <div>
-                      <p className="text-[11px] text-content-1 font-medium">Ative a YouTube Data API v3</p>
-                      <p className="text-[10px] text-content-4">Biblioteca → busque "YouTube Data API v3" → Ativar</p>
+                      <p className="text-[11px] text-content-1 font-medium">Criar credenciais OAuth2</p>
+                      <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="text-[10px] text-accent-light hover:underline">Ir pra Credenciais ↗</a>
+                      <p className="text-[9px] text-content-4 mt-0.5">Criar credenciais → ID do cliente OAuth → Aplicativo da web</p>
+                      <p className="text-[9px] text-content-4">URI de redirecionamento: <code className="bg-surface-4 px-1 rounded">http://localhost:8000/api/youtube/callback</code></p>
                     </div>
                   </div>
                   <div className="flex gap-3">
                     <div className="w-6 h-6 rounded-full bg-surface-4 flex items-center justify-center text-[10px] font-bold text-content-2 flex-shrink-0 mt-0.5">3</div>
                     <div>
-                      <p className="text-[11px] text-content-1 font-medium">Crie uma API Key</p>
-                      <p className="text-[10px] text-content-4">Credenciais → Criar credenciais → Chave de API</p>
+                      <p className="text-[11px] text-content-1 font-medium">Cole as credenciais abaixo</p>
+                      <p className="text-[9px] text-content-4">"ID do cliente" → API Key | "Chave secreta" → API Secret</p>
                     </div>
                   </div>
                   <div className="flex gap-3">
                     <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5">4</div>
                     <div>
-                      <p className="text-[11px] text-content-1 font-medium">Cole a API Key abaixo</p>
-                      <p className="text-[10px] text-content-4">Eh so esse campo — nao precisa de mais nada pra sincronizar</p>
+                      <p className="text-[11px] text-content-1 font-medium">Depois de salvar, clique em "Verificar" → "Autorizar"</p>
+                      <p className="text-[9px] text-content-4">O Google vai pedir permissao pra acessar seu canal</p>
                     </div>
                   </div>
                 </div>
               </div>
-              <Input label="API Key do YouTube" placeholder="AIzaSy... (começa com AIza)" value={form.api_key}
-                onChange={e => setForm({ ...form, api_key: e.target.value })} />
-              <p className="text-[9px] text-content-4">Essa key permite sincronizar dados do canal (inscritos, views, videos). Para upload automatico de videos, sera necessario OAuth2 (etapa futura).</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Client ID (ID do cliente OAuth)" placeholder="xxxxx.apps.googleusercontent.com" value={form.api_key}
+                  onChange={e => setForm({ ...form, api_key: e.target.value })} />
+                <Input label="Client Secret (Chave secreta)" placeholder="GOCSPX-..." type="password" value={form.access_token}
+                  onChange={e => setForm({ ...form, access_token: e.target.value })} />
+              </div>
+              <p className="text-[9px] text-content-4">Pra upload de videos precisa de OAuth2 (Client ID + Secret). A API Key simples so le dados.</p>
             </div>
           )}
 
@@ -443,6 +449,22 @@ export default function AccountsView() {
                   >
                     {diagnosing === acc.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                     {diagnosing === acc.id ? 'Analisando...' : 'IA: me ajuda a resolver'}
+                  </button>
+                )}
+
+                {/* Botão Autorizar YouTube */}
+                {acc.platform === 'youtube' && acc.has_credentials && verifyResults[acc.id]?.status !== 'connected' && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const r = await getYouTubeAuthUrl(acc.id)
+                        if (r.auth_url) window.open(r.auth_url, '_blank')
+                        else alert(r.error || 'Erro ao gerar URL')
+                      } catch (e) { alert(e.message) }
+                    }}
+                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-danger-muted rounded-lg text-danger text-[10px] font-medium hover:bg-danger/20 transition-colors"
+                  >
+                    <Key className="w-3 h-3" /> Autorizar YouTube (OAuth2)
                   </button>
                 )}
               </div>

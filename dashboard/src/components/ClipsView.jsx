@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Film, Upload, Trash2, ExternalLink, Eye, Clock, Play, X, Copy, Send, Maximize2, Loader2, Check, MessageCircle, RotateCcw, Wand2, Download, AlertTriangle, ArrowLeft } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { publishClip, deleteClip, publishClipTo, getAccounts, getClipComments, addClipComment, cloneClip, preparePublish } from '../api/client'
+import { publishClip, deleteClip, publishClipTo, getAccounts, getClipComments, addClipComment, cloneClip, preparePublish, uploadToYouTube } from '../api/client'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
 import EmptyState from './ui/EmptyState'
@@ -50,7 +50,13 @@ function PublishTab({ clip, accounts, onPublished }) {
     if (!selectedAccount) return
     setPublishing(true)
     try {
-      const r = await publishClipTo(clip.id, selectedAccount.id)
+      let r
+      if (selectedAccount.platform === 'youtube' && prepData?.can_auto_publish) {
+        // Upload real pro YouTube via OAuth
+        r = await uploadToYouTube(clip.id, selectedAccount.id, editTitle, editDesc, editTags)
+      } else {
+        r = await publishClipTo(clip.id, selectedAccount.id)
+      }
       setResult(r)
       setStep('done')
       if (r.status === 'published') onPublished()

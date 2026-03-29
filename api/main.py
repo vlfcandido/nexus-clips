@@ -1382,13 +1382,17 @@ async def prepare_publish(clip_id: int, account_id: int):
         can_auto_publish = True
         publish_method = "auto"
     elif account.platform == "youtube":
-        publish_method = "manual"
-        setup_needed = [
-            "YouTube requer OAuth2 pra upload de videos",
-            "A API Key permite apenas LER dados do canal",
-            "Pra upload automatico, seria necessario configurar OAuth2 (etapa futura)",
-            "Por enquanto: baixe o video e poste manualmente no YouTube Studio",
-        ]
+        if account.access_token and account.refresh_token:
+            can_auto_publish = True
+            publish_method = "auto"
+        else:
+            publish_method = "manual"
+            setup_needed = [
+                "YouTube precisa de autorizacao OAuth2 pra upload",
+                "Va em Contas → sua conta YouTube → Verificar → Autorizar YouTube",
+                "Siga o guia de 4 passos pra configurar OAuth2",
+                "Enquanto isso: baixe o video e poste pelo YouTube Studio",
+            ]
     elif account.platform in ("tiktok", "instagram"):
         publish_method = "manual"
         setup_needed = [
@@ -1438,4 +1442,213 @@ JSON: {{
         "setup_needed": setup_needed,
         "suggestion": suggestion,
         "video_path": clip.clip_path,
+    }
+
+
+# ==================== YOUTUBE OAUTH2 ====================
+
+@app.get("/api/youtube/auth-url/{account_id}")
+async def youtube_get_auth_url(account_id: int, request: Request):
+    """Gera URL de autorização do Google OAuth2."""
+    async with async_session() as session:
+        account = await session.get(PublishAccount, account_id)
+        if not account: raise HTTPException(404)
+
+    client_id = account.api_key
+    if not client_id:
+        return {"error": "Falta o Client ID. Configure na tela de Contas (campo API Key)."}
+
+    from publisher.youtube_oauth import get_auth_url
+    redirect_uri = f"{request.base_url}api/youtube/callback"
+    url = get_auth_url(client_id, redirect_uri)
+
+    return {"auth_url": url, "redirect_uri": redirect_uri}
+
+
+@app.get("/api/youtube/callback")
+async def youtube_oauth_callback(code: str = None, error: str = None):
+    """Callback do Google OAuth2 — recebe o code e troca por tokens."""
+    if error:
+        return {"error": error}
+    if not code:
+        return {"error": "Nenhum code recebido"}
+
+    # Busca a última conta YouTube que tem client_id
+    from sqlalchemy import select as sel
+    async with async_session() as session:
+        result = await session.execute(
+            sel(PublishAccount).where(PublishAccount.platform == "youtube", PublishAccount.api_key != "").order_by(PublishAccount.id.desc()).limit(1)
+        )
+        account = result.scalar_one_or_none()
+        if not account:
+            return {"error": "Nenhuma conta YouTube configurada"}
+
+    from publisher.youtube_oauth import exchange_code
+    redirect_uri = f"http://localhost:8000/api/youtube/callback"
+    tokens = await exchange_code(code, account.api_key, account.api_secret, redirect_uri)
+
+    if "error" in tokens:
+        return {"status": "error", "error": tokens["error"]}
+
+    # Salva tokens na conta
+    async with async_session() as session:
+        acc = await session.get(PublishAccount, account.id)
+        acc.access_token = tokens["access_token"]
+        if tokens.get("refresh_token"):
+            acc.refresh_token = tokens["refresh_token"]
+        await session.commit()
+
+    log.info("youtube.oauth.complete", account_id=account.id)
+    return {"status": "ok", "message": "YouTube autorizado com sucesso! Pode fechar esta aba e voltar pro Nexus Clips."}
+
+
+@app.post("/api/youtube/upload/{clip_id}/{account_id}")
+async def youtube_upload(clip_id: int, account_id: int, title: str = "", description: str = "", tags: str = ""):
+    """Upload de vídeo pro YouTube."""
+    async with async_session() as session:
+        clip = await session.get(Clip, clip_id)
+        if not clip: raise HTTPException(404, "Clip nao encontrado")
+        account = await session.get(PublishAccount, account_id)
+        if not account: raise HTTPException(404, "Conta nao encontrada")
+
+    if not account.access_token:
+        return {"error": "Conta nao autorizada. Faca o OAuth primeiro."}
+
+    # Resolve path do vídeo
+    video_full_path = ""
+    if clip.clip_path:
+        video_full_path = str(settings.clips_output_dir / clip.clip_path.lstrip("/media/"))
+
+    if not video_full_path or not __import__('pathlib').Path(video_full_path).exists():
+        return {"error": "Arquivo de video nao encontrado"}
+
+    from publisher.youtube_oauth import upload_video, refresh_access_token
+
+    # Tenta refresh do token antes
+    if account.refresh_token and account.api_key and account.api_secret:
+        refreshed = await refresh_access_token(account.refresh_token, account.api_key, account.api_secret)
+        if "access_token" in refreshed:
+            account.access_token = refreshed["access_token"]
+            async with async_session() as session:
+                acc = await session.get(PublishAccount, account_id)
+                acc.access_token = refreshed["access_token"]
+                await session.commit()
+
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else clip.hashtags.split()
+
+    result = await upload_video(
+        access_token=account.access_token,
+        video_path=video_full_path,
+        title=title or clip.caption or clip.moment_text[:100],
+        description=description or clip.moment_text,
+        tags=tag_list,
+    )
+
+    if "error" in result:
+        return {"status": "error", "error": result["error"]}
+
+    # Salva no DB
+    async with async_session() as session:
+        c = await session.get(Clip, clip_id)
+        c.published = True
+        c.published_at = dt.datetime.utcnow()
+        c.youtube_url = result.get("url", "")
+
+        pub_log = PublishLog(
+            clip_id=clip_id, account_id=account_id, platform="youtube",
+            post_url=result.get("url", ""), status="published",
+            published_at=dt.datetime.utcnow(),
+        )
+        session.add(pub_log)
+        await session.commit()
+
+    notify_sse("clip_published", {"clip_id": clip_id, "platform": "youtube", "url": result.get("url")})
+    return {"status": "published", "video_id": result.get("video_id"), "url": result.get("url")}
+
+
+@app.get("/api/youtube/setup-guide/{account_id}")
+async def youtube_setup_guide(account_id: int):
+    """IA gera guia passo-a-passo personalizado pro OAuth do YouTube."""
+    async with async_session() as session:
+        account = await session.get(PublishAccount, account_id)
+        if not account: raise HTTPException(404)
+
+    has_client_id = bool(account.api_key)
+    has_client_secret = bool(account.api_secret)
+    has_access_token = bool(account.access_token)
+    has_refresh_token = bool(account.refresh_token)
+
+    # Determina em que passo o Pedro está
+    if not has_client_id:
+        current_step = 1
+    elif not has_client_secret:
+        current_step = 2
+    elif not has_access_token:
+        current_step = 3
+    else:
+        current_step = 4  # Pronto!
+
+    steps = [
+        {
+            "number": 1,
+            "title": "Criar projeto no Google Cloud",
+            "done": has_client_id,
+            "instructions": [
+                "Acesse console.cloud.google.com",
+                "Crie um novo projeto (ou use um existente)",
+                "Va em 'APIs e Servicos' → 'Biblioteca'",
+                "Busque 'YouTube Data API v3' → clique em ATIVAR",
+            ],
+            "link": "https://console.cloud.google.com/apis/library/youtube.googleapis.com",
+        },
+        {
+            "number": 2,
+            "title": "Criar credenciais OAuth2",
+            "done": has_client_secret,
+            "instructions": [
+                "Va em 'APIs e Servicos' → 'Credenciais'",
+                "Clique em 'Criar credenciais' → 'ID do cliente OAuth'",
+                "Tipo: 'Aplicativo da web'",
+                "Nome: 'Nexus Clips'",
+                "URIs de redirecionamento autorizados: http://localhost:8000/api/youtube/callback",
+                "Clique em 'Criar'",
+                "Copie o 'ID do cliente' → cole em API Key na tela de Contas",
+                "Copie a 'Chave secreta do cliente' → cole em API Secret na tela de Contas",
+            ],
+            "link": "https://console.cloud.google.com/apis/credentials",
+            "fields": ["api_key", "api_secret"],
+        },
+        {
+            "number": 3,
+            "title": "Autorizar o app",
+            "done": has_access_token,
+            "instructions": [
+                "Com Client ID e Secret configurados, clique em 'Autorizar' abaixo",
+                "Uma janela do Google vai abrir pedindo permissao",
+                "Faca login com a conta do YouTube",
+                "Clique em 'Permitir'",
+                "O sistema vai receber os tokens automaticamente",
+            ],
+            "action": "authorize",
+        },
+        {
+            "number": 4,
+            "title": "Pronto pra publicar!",
+            "done": has_access_token and has_refresh_token,
+            "instructions": [
+                "O YouTube esta conectado e autorizado",
+                "Agora voce pode publicar videos direto pelo Nexus Clips",
+                "Va em Conteudos → clique num video → Publicar → YouTube",
+            ],
+        },
+    ]
+
+    return {
+        "current_step": current_step,
+        "total_steps": 4,
+        "steps": steps,
+        "account_id": account_id,
+        "has_client_id": has_client_id,
+        "has_client_secret": has_client_secret,
+        "has_access_token": has_access_token,
     }

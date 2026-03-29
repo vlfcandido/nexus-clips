@@ -26,6 +26,12 @@ export const addClipComment = (id, data) => request(`/clips/${id}/comments`, { m
 export const cloneClip = (id, adjustments = '') => request(`/clips/${id}/clone`, { method: 'POST', body: JSON.stringify({ adjustments }) })
 export const preparePublish = (clipId, accountId) => request(`/clips/${clipId}/prepare-publish/${accountId}`, { method: 'POST' })
 
+// YouTube OAuth
+export const getYouTubeAuthUrl = (accountId) => request(`/youtube/auth-url/${accountId}`)
+export const getYouTubeSetupGuide = (accountId) => request(`/youtube/setup-guide/${accountId}`)
+export const uploadToYouTube = (clipId, accountId, title, description, tags) =>
+  request(`/youtube/upload/${clipId}/${accountId}?title=${encodeURIComponent(title)}&description=${encodeURIComponent(description)}&tags=${encodeURIComponent(tags)}`, { method: 'POST' })
+
 // Templates visuais
 export const getTemplates = () => request('/templates')
 export const updateTemplate = (id, data) => request(`/templates/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
