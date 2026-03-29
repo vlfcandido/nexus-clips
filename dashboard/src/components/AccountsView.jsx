@@ -236,21 +236,6 @@ export default function AccountsView() {
                 </div>
               </div>
 
-              {/* Verify result */}
-              {verifyResults[acc.id] && (
-                <div className={`mt-2 px-3 py-2 rounded-lg text-[10px] ${
-                  verifyResults[acc.id].status === 'connected' ? 'bg-success-muted text-success' :
-                  verifyResults[acc.id].status === 'manual' ? 'bg-warning-muted text-warning' :
-                  'bg-danger-muted text-danger'
-                }`}>
-                  <p className="font-medium">{verifyResults[acc.id].message}</p>
-                  {verifyResults[acc.id].permissions?.length > 0 && (
-                    <ul className="mt-1 space-y-0.5 text-content-3">
-                      {verifyResults[acc.id].permissions.map((p, i) => <li key={i}>{p}</li>)}
-                    </ul>
-                  )}
-                </div>
-              )}
               </div>
 
               {/* Actions */}
@@ -265,7 +250,8 @@ export default function AccountsView() {
                 }}
                   className={`px-2 py-1.5 rounded-lg text-[11px] transition-colors ${
                     verifying === acc.id ? 'text-accent-light' : 'text-content-4 hover:text-accent-light hover:bg-accent-muted'
-                  }`}>
+                  }`}
+                  title="Verificar conexao">
                   {verifying === acc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
                 </button>
                 <button onClick={() => startEdit(acc)}
@@ -284,6 +270,22 @@ export default function AccountsView() {
                 </button>
               </div>
             </div>
+
+            {/* Verify result — abaixo do card */}
+            {verifyResults[acc.id] && (
+              <div className={`mt-2 px-3 py-2 rounded-lg text-[10px] ${
+                verifyResults[acc.id].status === 'connected' ? 'bg-success-muted text-success' :
+                verifyResults[acc.id].status === 'manual' ? 'bg-warning-muted text-warning' :
+                'bg-danger-muted text-danger'
+              }`}>
+                <p className="font-medium">{verifyResults[acc.id].message}</p>
+                {verifyResults[acc.id].permissions?.length > 0 && (
+                  <ul className="mt-1 space-y-0.5 text-content-3">
+                    {verifyResults[acc.id].permissions.map((p, i) => <li key={i}>{p}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
