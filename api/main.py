@@ -64,17 +64,45 @@ async def shutdown():
 
 # ==================== SSE ====================
 
+# Event bus — notifica SSE quando algo muda
+_sse_events: asyncio.Queue = asyncio.Queue()
+
+
+def notify_sse(event_type: str, data: dict = None):
+    """Envia evento pra todos os clientes SSE conectados."""
+    try:
+        _sse_events.put_nowait({"type": event_type, "data": data or {}})
+    except Exception:
+        pass
+
+
 @app.get("/api/sse")
 async def sse_stream(request: Request):
     """Server-Sent Events — updates em tempo real."""
     async def event_generator():
+        last_analytics = 0
         while True:
             if await request.is_disconnected():
                 break
-            # Pega últimos clips e analytics
-            analytics = await get_analytics_summary()
-            yield f"data: {json.dumps({'type': 'analytics', 'data': analytics})}\n\n"
-            await asyncio.sleep(10)
+
+            # Envia analytics a cada 10s
+            now = asyncio.get_event_loop().time()
+            if now - last_analytics > 10:
+                try:
+                    analytics = await get_analytics_summary()
+                    yield f"data: {json.dumps({'type': 'analytics', 'data': analytics})}\n\n"
+                except Exception:
+                    pass
+                last_analytics = now
+
+            # Checa event bus (non-blocking)
+            try:
+                event = _sse_events.get_nowait()
+                yield f"data: {json.dumps(event)}\n\n"
+            except asyncio.QueueEmpty:
+                pass
+
+            await asyncio.sleep(1)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -216,6 +244,7 @@ async def generate_clip_manual(data: ManualClipCreate):
 
         clip_id = result.get("db_clip_id")
         if clip_id:
+            notify_sse("new_clip", {"clip_id": clip_id})
             return {
                 "status": "ok",
                 "clip_id": clip_id,
@@ -300,6 +329,7 @@ async def publish_clip_to_account(clip_id: int, account_id: int):
                     msg = resp.json()["result"]
                     result_url = f"telegram://msg/{msg.get('message_id', '')}"
                     log.info("publish.telegram.ok", clip_id=clip_id, msg_id=msg.get("message_id"))
+                    notify_sse("clip_published", {"clip_id": clip_id, "platform": "telegram"})
                 else:
                     error_msg = resp.json().get("description", f"HTTP {resp.status_code}")
                     log.error("publish.telegram.fail", error=error_msg)

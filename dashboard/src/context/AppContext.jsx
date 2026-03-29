@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useReducer, useCallback } from 'react'
+import { createContext, useContext, useEffect, useReducer, useCallback, useRef } from 'react'
 import { getClips, getSources, getAnalytics, getTrending, getPipelineStatus } from '../api/client'
 
 const AppContext = createContext()
@@ -40,13 +40,13 @@ function reducer(state, action) {
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
+  const filtersRef = useRef(state.filters)
+  filtersRef.current = state.filters
 
   const refresh = useCallback(async () => {
-    dispatch({ type: 'SET_LOADING', payload: true })
     try {
-      // Carrega cada endpoint independente (um falhando nao bloqueia os outros)
       const [clipsData, sourcesData, analyticsData, trendingData, pipelineData] = await Promise.allSettled([
-        getClips(state.filters),
+        getClips(filtersRef.current),
         getSources(),
         getAnalytics(),
         getTrending(),
@@ -61,31 +61,52 @@ export function AppProvider({ children }) {
       console.error('Refresh error:', err)
     }
     dispatch({ type: 'SET_LOADING', payload: false })
-  }, [state.filters])
+  }, [])
 
+  // Polling a cada 10s
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 30000)
+    const interval = setInterval(refresh, 10000)
     return () => clearInterval(interval)
   }, [refresh])
 
-  // SSE
+  // Recarrega quando filters mudam
+  useEffect(() => { refresh() }, [state.filters, refresh])
+
+  // SSE — atualiza em tempo real quando algo muda no backend
   useEffect(() => {
-    const es = new EventSource('/api/sse')
-    es.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data)
-        if (msg.type === 'analytics') {
-          dispatch({ type: 'SET_ANALYTICS', payload: msg.data })
-        }
-      } catch {}
+    let es = null
+    let reconnectTimer = null
+
+    function connect() {
+      es = new EventSource('/api/sse')
+
+      es.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data)
+          if (msg.type === 'analytics') {
+            dispatch({ type: 'SET_ANALYTICS', payload: msg.data })
+          }
+          if (msg.type === 'new_clip' || msg.type === 'clip_published') {
+            // Novo clip ou publicação — recarrega tudo
+            refresh()
+          }
+        } catch {}
+      }
+
+      es.onerror = () => {
+        es.close()
+        // Reconecta em 5s
+        reconnectTimer = setTimeout(connect, 5000)
+      }
     }
-    es.onerror = () => {
-      es.close()
-      setTimeout(() => {}, 5000)
+
+    connect()
+    return () => {
+      if (es) es.close()
+      if (reconnectTimer) clearTimeout(reconnectTimer)
     }
-    return () => es.close()
-  }, [])
+  }, [refresh])
 
   return (
     <AppContext.Provider value={{ state, dispatch, refresh }}>
