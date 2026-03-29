@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # --- YouTube ---
     youtube_api_key: str = ""
 
+    # --- Pexels (imagens grátis) ---
+    pexels_api_key: str = ""
+
     # --- Paths ---
     db_path: str = "nexus_clips.db"
     clips_output_dir: Path = Path("./output")
