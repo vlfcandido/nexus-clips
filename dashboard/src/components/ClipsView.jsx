@@ -318,7 +318,7 @@ export default function ClipsView() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 stagger">
           {clips.map(clip => (
             <div key={clip.id} className="group bg-surface-2 border border-stroke-1 rounded-2xl overflow-hidden hover:border-stroke-2 transition-all cursor-pointer" onClick={() => setSelectedClip(clip)}>
-              <VideoThumbnail src={clip.thumbnail_path} duration={`${Math.floor(clip.duration_seconds / 60)}:${String(clip.duration_seconds % 60).padStart(2, '0')}`} className="w-full h-36" />
+              <VideoThumbnail src={clip.thumbnail_path} videoSrc={clip.clip_path} duration={`${Math.floor(clip.duration_seconds / 60)}:${String(clip.duration_seconds % 60).padStart(2, '0')}`} className="w-full h-36" />
               <div className="p-3.5">
                 <div className="flex items-center gap-1.5 mb-2">
                   <span className="text-xs">{CAT_EMOJI[clip.category] || '📎'}</span>

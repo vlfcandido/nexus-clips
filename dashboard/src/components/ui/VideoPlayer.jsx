@@ -56,7 +56,7 @@ export default function VideoPlayer({ src, poster, onClose, className = '' }) {
   )
 }
 
-export function VideoThumbnail({ src, duration, onClick, className = '' }) {
+export function VideoThumbnail({ src, videoSrc, duration, onClick, className = '' }) {
   return (
     <div
       className={`relative bg-surface-4 rounded-xl overflow-hidden cursor-pointer group ${className}`}
@@ -64,6 +64,8 @@ export function VideoThumbnail({ src, duration, onClick, className = '' }) {
     >
       {src ? (
         <img src={src} className="w-full h-full object-cover" alt="" />
+      ) : videoSrc ? (
+        <video src={videoSrc} className="w-full h-full object-cover" muted preload="metadata" />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
           <Play className="w-5 h-5 text-content-4" />
