@@ -118,20 +118,18 @@ function PublishTab({ clip, accounts, onPublished }) {
 
         {/* Se nao pode auto-publicar */}
         {!prepData.can_auto_publish && prepData.setup_needed?.length > 0 && (
-          <div className="p-3 bg-warning-muted border border-warning/20 rounded-xl">
-            <p className="text-[11px] font-semibold text-warning mb-2 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5" /> Upload manual necessario
+          <div className="p-3 bg-danger-muted border border-danger/20 rounded-xl">
+            <p className="text-[11px] font-semibold text-danger mb-2 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" /> Autorizacao necessaria
             </p>
             <ul className="text-[10px] text-content-3 space-y-1">
               {prepData.setup_needed.map((s, i) => (
-                <li key={i} className="flex items-start gap-1.5"><span className="text-warning">→</span> {s}</li>
+                <li key={i} className="flex items-start gap-1.5"><span className="text-danger">→</span> {s}</li>
               ))}
             </ul>
-            {clip.clip_path && (
-              <a href={clip.clip_path} download className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-accent-muted text-accent-light rounded-lg text-[10px] font-medium hover:bg-accent/20">
-                <Download className="w-3 h-3" /> Baixar video pra postar manualmente
-              </a>
-            )}
+            <p className="text-[10px] text-content-2 mt-2 font-medium">
+              Va em <strong>Contas</strong> → sua conta → <strong>Verificar</strong> → <strong>Autorizar YouTube</strong> pra habilitar upload direto.
+            </p>
           </div>
         )}
 
@@ -157,7 +155,6 @@ function PublishTab({ clip, accounts, onPublished }) {
             className="w-full bg-surface-3 border border-stroke-2 rounded-lg px-3 py-2 text-xs text-content-1 placeholder-content-4 outline-none focus:border-accent/50" />
         </div>
 
-        {/* Copiar tudo (pra upload manual) */}
         <div className="flex gap-2 pt-1">
           {prepData.can_auto_publish ? (
             <Button icon={publishing ? Loader2 : Send} onClick={handleConfirmPublish}
@@ -165,18 +162,12 @@ function PublishTab({ clip, accounts, onPublished }) {
               {publishing ? 'Publicando...' : 'Confirmar e publicar'}
             </Button>
           ) : (
-            <Button variant="secondary" icon={Copy} onClick={() => {
-              navigator.clipboard.writeText(`${editTitle}\n\n${editDesc}\n\n${editTags}`)
-              setResult({ status: 'copied' })
-            }}>
-              Copiar titulo + descricao + tags
+            <Button variant="secondary" disabled className="opacity-50 cursor-not-allowed">
+              Configure OAuth pra habilitar publicacao
             </Button>
           )}
         </div>
 
-        {result?.status === 'copied' && (
-          <p className="text-[10px] text-success">✅ Copiado! Cole no YouTube Studio ao fazer upload manual.</p>
-        )}
       </div>
     )
   }

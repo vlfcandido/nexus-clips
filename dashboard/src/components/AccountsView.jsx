@@ -43,7 +43,7 @@ export default function AccountsView() {
   const [form, setForm] = useState({
     name: '', platform: 'tiktok', username: '', topics: [],
     auto_publish: false, max_posts_per_day: 5,
-    api_key: '', access_token: '',
+    api_key: '', api_secret: '', access_token: '',
   })
 
   async function load() {
@@ -89,7 +89,7 @@ export default function AccountsView() {
     setForm({
       name: acc.name, platform: acc.platform, username: acc.username,
       topics: acc.topics, auto_publish: acc.auto_publish,
-      max_posts_per_day: acc.max_posts_per_day, api_key: '', access_token: '',
+      max_posts_per_day: acc.max_posts_per_day, api_key: '', api_secret: '', access_token: '',
     })
     setEditingId(acc.id)
     setShowForm(true)
@@ -197,10 +197,12 @@ export default function AccountsView() {
               <div className="grid grid-cols-2 gap-3">
                 <Input label="Client ID (ID do cliente OAuth)" placeholder="xxxxx.apps.googleusercontent.com" value={form.api_key}
                   onChange={e => setForm({ ...form, api_key: e.target.value })} />
-                <Input label="Client Secret (Chave secreta)" placeholder="GOCSPX-..." type="password" value={form.access_token}
-                  onChange={e => setForm({ ...form, access_token: e.target.value })} />
+                <Input label="Client Secret (Chave secreta)" placeholder="GOCSPX-..." type="password" value={form.api_secret}
+                  onChange={e => setForm({ ...form, api_secret: e.target.value })} />
               </div>
-              <p className="text-[9px] text-content-4">Pra upload de videos precisa de OAuth2 (Client ID + Secret). A API Key simples so le dados.</p>
+              <div className="p-2.5 bg-warning-muted border border-warning/20 rounded-lg">
+                <p className="text-[10px] text-warning font-medium">Depois de salvar, clique em Verificar (icone Wi-Fi) e depois em "Autorizar YouTube" pra completar a conexao.</p>
+              </div>
             </div>
           )}
 
