@@ -51,24 +51,53 @@ class Settings(BaseSettings):
     publish_platforms: list[str] = ["telegram"]  # telegram, tiktok, instagram, youtube, twitter
 
     # --- Monitoring ---
-    # Temas pra monitorar
+    # Temas pra monitorar (ordem de prioridade: guerra > copa > eleições)
     monitor_topics: list[str] = [
+        # Guerra (prioridade agora)
+        "guerra",
+        "ucrânia",
+        "rússia",
+        "israel",
+        "palestina",
+        "hamas",
+        "gaza",
+        "conflito",
+        "míssil",
+        "otan",
+        "trump guerra",
+        # Copa do Mundo (prioridade Jun-Jul)
         "copa do mundo",
         "seleção brasileira",
         "brasil futebol",
+        "copa 2026",
+        "eliminatórias",
+        # Política/Eleições (prioridade Ago-Out)
         "política brasil",
         "bolsonaro",
         "lula",
         "congresso",
+        "eleições 2026",
+        # Geral (trending cobre o resto)
+        "breaking news brasil",
     ]
 
     # Contas do Twitter pra monitorar
     monitor_twitter_accounts: list[str] = [
+        # Guerra/Internacional
+        "BBCBrasil",
+        "UOLNoticias",
+        "folaboreia",
+        # Futebol
         "ge_globo",
         "UOLEsporte",
         "ESPNBrasil",
+        "TNTSportsBR",
+        # Política
         "FolhaPolitica",
         "EstadaoPolitica",
+        "g1",
+        # Breaking
+        "JornalOGlobo",
     ]
 
     # Canais YouTube Live pra monitorar
@@ -76,9 +105,15 @@ class Settings(BaseSettings):
 
     # RSS feeds
     monitor_rss_feeds: list[str] = [
+        # Guerra/Internacional
+        "https://rss.uol.com.br/feed/noticias.xml",
+        "https://feeds.bbci.co.uk/portuguese/rss.xml",
+        # Futebol
         "https://ge.globo.com/rss/futebol/",
-        "https://www.uol.com.br/esporte/futebol/rss.xml",
+        # Política
         "https://rss.folha.uol.com.br/poder/rss091.xml",
+        # Geral
+        "https://g1.globo.com/rss/g1/",
     ]
 
 

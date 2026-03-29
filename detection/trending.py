@@ -141,9 +141,18 @@ _POLITICA_KEYWORDS = {
     "eleição", "voto", "urna", "tse",
 }
 
+_GUERRA_KEYWORDS = {
+    "guerra", "ucrânia", "rússia", "putin", "zelensky", "israel",
+    "palestina", "hamas", "gaza", "míssil", "bombardeio", "otan",
+    "nato", "conflito", "invasão", "ataque", "tropas", "cessar-fogo",
+    "trump guerra", "irã", "hezbollah", "síria",
+}
+
 
 def _categorize_trend(text: str) -> str:
     text_lower = text.lower()
+    if any(kw in text_lower for kw in _GUERRA_KEYWORDS):
+        return "guerra"
     if any(kw in text_lower for kw in _FUTEBOL_KEYWORDS):
         return "futebol"
     if any(kw in text_lower for kw in _POLITICA_KEYWORDS):
