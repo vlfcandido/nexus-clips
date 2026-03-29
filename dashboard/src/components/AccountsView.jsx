@@ -206,12 +206,10 @@ export default function AccountsView() {
           <div key={acc.id}
             className={`bg-surface-2 border border-stroke-1 rounded-xl p-4 hover:border-stroke-2 transition-all ${!acc.active ? 'opacity-40' : ''}`}>
             <div className="flex items-start gap-4">
-              {/* Icon */}
               <div className="w-10 h-10 rounded-xl bg-surface-3 flex items-center justify-center text-lg flex-shrink-0">
                 {PLATFORM_ICONS[acc.platform]}
               </div>
 
-              {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm font-semibold text-content-1">{acc.name}</span>
@@ -219,16 +217,10 @@ export default function AccountsView() {
                   {acc.auto_publish && <Badge variant="success" dot>Auto</Badge>}
                   {acc.has_credentials && <Badge variant="accent"><Shield className="w-2.5 h-2.5" /> Conectada</Badge>}
                 </div>
-
                 {acc.username && <p className="text-xs text-content-3">{acc.username}</p>}
-
                 <div className="flex items-center gap-2 mt-2">
-                  {acc.topics.map(t => (
-                    <Badge key={t} variant="default">{t}</Badge>
-                  ))}
+                  {acc.topics.map(t => <Badge key={t} variant="default">{t}</Badge>)}
                 </div>
-
-                {/* Stats */}
                 <div className="flex items-center gap-4 mt-2 text-[10px] text-content-4">
                   <span className="flex items-center gap-1"><Film className="w-3 h-3" />{acc.total_posts} posts</span>
                   <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{acc.total_views.toLocaleString('pt-BR')} views</span>
@@ -236,44 +228,33 @@ export default function AccountsView() {
                 </div>
               </div>
 
-              </div>
-
-              {/* Actions */}
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button onClick={async () => {
                   setVerifying(acc.id)
                   try {
-                    const result = await verifyAccount(acc.id)
-                    setVerifyResults(prev => ({ ...prev, [acc.id]: result }))
+                    const r = await verifyAccount(acc.id)
+                    setVerifyResults(prev => ({ ...prev, [acc.id]: r }))
                   } catch (e) { setVerifyResults(prev => ({ ...prev, [acc.id]: { status: 'error', message: e.message } })) }
                   setVerifying(null)
                 }}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] transition-colors ${
-                    verifying === acc.id ? 'text-accent-light' : 'text-content-4 hover:text-accent-light hover:bg-accent-muted'
-                  }`}
+                  className={`p-1.5 rounded-lg transition-colors ${verifying === acc.id ? 'text-accent-light' : 'text-content-4 hover:text-accent-light hover:bg-accent-muted'}`}
                   title="Verificar conexao">
-                  {verifying === acc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
+                  {verifying === acc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wifi className="w-4 h-4" />}
                 </button>
-                <button onClick={() => startEdit(acc)}
-                  className="px-2 py-1.5 rounded-lg text-[11px] text-content-4 hover:text-content-2 hover:bg-surface-3 transition-colors">
+                <button onClick={() => startEdit(acc)} className="px-2 py-1.5 rounded-lg text-[11px] text-content-4 hover:text-content-2 hover:bg-surface-3 transition-colors">
                   Editar
                 </button>
-                <button onClick={() => handleToggle(acc)}
-                  className="p-1.5 rounded-lg hover:bg-surface-3 transition-colors">
-                  {acc.active
-                    ? <ToggleRight className="w-5 h-5 text-success" />
-                    : <ToggleLeft className="w-5 h-5 text-content-4" />}
+                <button onClick={() => handleToggle(acc)} className="p-1.5 rounded-lg hover:bg-surface-3 transition-colors">
+                  {acc.active ? <ToggleRight className="w-5 h-5 text-success" /> : <ToggleLeft className="w-5 h-5 text-content-4" />}
                 </button>
-                <button onClick={() => handleDelete(acc.id)}
-                  className="p-1.5 rounded-lg text-content-4 hover:text-danger hover:bg-danger-muted transition-colors">
+                <button onClick={() => handleDelete(acc.id)} className="p-1.5 rounded-lg text-content-4 hover:text-danger hover:bg-danger-muted transition-colors">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* Verify result — abaixo do card */}
             {verifyResults[acc.id] && (
-              <div className={`mt-2 px-3 py-2 rounded-lg text-[10px] ${
+              <div className={`mt-3 px-3 py-2 rounded-lg text-[10px] ${
                 verifyResults[acc.id].status === 'connected' ? 'bg-success-muted text-success' :
                 verifyResults[acc.id].status === 'manual' ? 'bg-warning-muted text-warning' :
                 'bg-danger-muted text-danger'
