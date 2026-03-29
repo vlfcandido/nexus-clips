@@ -1360,3 +1360,82 @@ JSON: {{
         template_id = t.id
 
     return {"status": "ok", "template_id": template_id, "template": result}
+
+
+# ==================== PUBLISH PREPARATION ====================
+
+@app.post("/api/clips/{clip_id}/prepare-publish/{account_id}")
+async def prepare_publish(clip_id: int, account_id: int):
+    """Gera sugestao de titulo, descricao e tags pra publicacao."""
+    async with async_session() as session:
+        clip = await session.get(Clip, clip_id)
+        if not clip: raise HTTPException(404)
+        account = await session.get(PublishAccount, account_id)
+        if not account: raise HTTPException(404)
+
+    # Verifica se a plataforma suporta upload automatico
+    can_auto_publish = False
+    publish_method = "manual"
+    setup_needed = []
+
+    if account.platform == "telegram" and account.access_token:
+        can_auto_publish = True
+        publish_method = "auto"
+    elif account.platform == "youtube":
+        publish_method = "manual"
+        setup_needed = [
+            "YouTube requer OAuth2 pra upload de videos",
+            "A API Key permite apenas LER dados do canal",
+            "Pra upload automatico, seria necessario configurar OAuth2 (etapa futura)",
+            "Por enquanto: baixe o video e poste manualmente no YouTube Studio",
+        ]
+    elif account.platform in ("tiktok", "instagram"):
+        publish_method = "manual"
+        setup_needed = [
+            f"{account.platform} requer aprovacao de app pra upload automatico",
+            "Baixe o video e poste manualmente",
+        ]
+    elif account.platform == "twitter" and account.access_token:
+        can_auto_publish = True
+        publish_method = "auto"
+
+    # Gera sugestao de titulo/descricao/tags com IA
+    suggestion = {"title": clip.caption or clip.moment_text[:100], "description": clip.moment_text, "tags": clip.hashtags}
+
+    try:
+        from config.llm import llm_json
+        from publisher.platform_specs import get_specs
+        specs = get_specs(account.platform)
+
+        result = await llm_json(
+            system="Voce e um especialista em SEO de redes sociais. Gere titulo, descricao e tags otimizados. Responda em JSON.",
+            user=f"""Conteudo: {clip.moment_text}
+Caption atual: {clip.caption}
+Hashtags atuais: {clip.hashtags}
+Plataforma: {account.platform}
+Max chars titulo: {specs.get('caption_max_chars', 100)}
+Max hashtags: {specs.get('hashtags_max', 10)}
+
+JSON: {{
+    "title": "titulo otimizado pra {account.platform} (SEO, gancho, max {specs.get('caption_max_chars', 100)} chars)",
+    "description": "descricao completa com keywords",
+    "tags": ["tag1", "tag2", "tag3"]
+}}""",
+            temperature=0.5,
+            max_tokens=300,
+        )
+        suggestion = result
+    except Exception as e:
+        log.warning("prepare_publish.suggestion_error", error=str(e))
+
+    return {
+        "clip_id": clip_id,
+        "account_id": account_id,
+        "platform": account.platform,
+        "account_name": account.name,
+        "can_auto_publish": can_auto_publish,
+        "publish_method": publish_method,
+        "setup_needed": setup_needed,
+        "suggestion": suggestion,
+        "video_path": clip.clip_path,
+    }

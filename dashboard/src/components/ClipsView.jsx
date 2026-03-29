@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Film, Upload, Trash2, ExternalLink, Eye, Clock, Play, X, Copy, Send, Maximize2, Loader2, Check, MessageCircle, RotateCcw, Wand2 } from 'lucide-react'
+import { Film, Upload, Trash2, ExternalLink, Eye, Clock, Play, X, Copy, Send, Maximize2, Loader2, Check, MessageCircle, RotateCcw, Wand2, Download, AlertTriangle, ArrowLeft } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { publishClip, deleteClip, publishClipTo, getAccounts, getClipComments, addClipComment, cloneClip } from '../api/client'
+import { publishClip, deleteClip, publishClipTo, getAccounts, getClipComments, addClipComment, cloneClip, preparePublish } from '../api/client'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
 import EmptyState from './ui/EmptyState'
@@ -13,6 +13,197 @@ const TOPIC_VARIANT = {
 const CAT_EMOJI = {
   gol: '⚽', polêmica: '🔥', declaração: '🎙️', treta: '💥',
   breaking: '🚨', humor: '😂', análise: '📊',
+}
+
+function PublishTab({ clip, accounts, onPublished }) {
+  const [step, setStep] = useState('select') // select, prepare, confirm, done
+  const [selectedAccount, setSelectedAccount] = useState(null)
+  const [preparing, setPreparing] = useState(false)
+  const [prepData, setPrepData] = useState(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [editTags, setEditTags] = useState('')
+  const [publishing, setPublishing] = useState(false)
+  const [result, setResult] = useState(null)
+
+  const platformEmoji = { tiktok: '🎵', instagram: '📸', youtube: '▶️', twitter: '𝕏', telegram: '✈️' }
+
+  async function handleSelectAccount(acc) {
+    setSelectedAccount(acc)
+    setPreparing(true)
+    setStep('prepare')
+    try {
+      const data = await preparePublish(clip.id, acc.id)
+      setPrepData(data)
+      setEditTitle(data.suggestion?.title || clip.caption || '')
+      setEditDesc(data.suggestion?.description || clip.moment_text || '')
+      setEditTags((data.suggestion?.tags || []).join(', '))
+      setStep('confirm')
+    } catch (e) {
+      setResult({ status: 'error', error: e.message })
+      setStep('select')
+    }
+    setPreparing(false)
+  }
+
+  async function handleConfirmPublish() {
+    if (!selectedAccount) return
+    setPublishing(true)
+    try {
+      const r = await publishClipTo(clip.id, selectedAccount.id)
+      setResult(r)
+      setStep('done')
+      if (r.status === 'published') onPublished()
+    } catch (e) { setResult({ status: 'error', error: e.message }) }
+    setPublishing(false)
+  }
+
+  // Step 1: Selecionar conta
+  if (step === 'select') {
+    return (
+      <div className="space-y-3">
+        <p className="text-[10px] text-content-4">Escolha onde publicar:</p>
+        {accounts.filter(a => a.active).map(acc => (
+          <button key={acc.id} onClick={() => handleSelectAccount(acc)}
+            className="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-3/30 hover:bg-surface-3 border border-stroke-1 hover:border-stroke-2 transition-all text-left">
+            <span className="text-lg">{platformEmoji[acc.platform] || '📱'}</span>
+            <div className="flex-1">
+              <p className="text-xs font-medium text-content-1">{acc.name}</p>
+              <p className="text-[10px] text-content-4">{acc.platform} · {acc.username}</p>
+            </div>
+            {acc.has_credentials ? <Badge variant="success" dot>Pronta</Badge> : <Badge variant="warning">Config</Badge>}
+          </button>
+        ))}
+        {accounts.filter(a => a.active).length === 0 && (
+          <p className="text-xs text-content-4 py-4 text-center">Nenhuma conta. Va em Contas pra conectar.</p>
+        )}
+      </div>
+    )
+  }
+
+  // Step 2: Preparando
+  if (step === 'prepare') {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-5 h-5 text-accent-light animate-spin mr-2" />
+        <span className="text-xs text-content-3">Gerando sugestoes de titulo e tags...</span>
+      </div>
+    )
+  }
+
+  // Step 3: Confirmar (titulo, descricao, tags editaveis)
+  if (step === 'confirm' && prepData) {
+    return (
+      <div className="space-y-3">
+        <button onClick={() => { setStep('select'); setPrepData(null) }} className="flex items-center gap-1 text-[10px] text-content-4 hover:text-content-2">
+          <ArrowLeft className="w-3 h-3" /> Voltar
+        </button>
+
+        <div className="flex items-center gap-2 p-2.5 bg-surface-3/30 rounded-xl">
+          <span className="text-lg">{platformEmoji[prepData.platform]}</span>
+          <div>
+            <p className="text-xs font-semibold text-content-1">{prepData.account_name}</p>
+            <p className="text-[9px] text-content-4">{prepData.platform}</p>
+          </div>
+          <Badge variant={prepData.can_auto_publish ? 'success' : 'warning'} className="ml-auto">
+            {prepData.can_auto_publish ? 'Upload automatico' : 'Upload manual'}
+          </Badge>
+        </div>
+
+        {/* Se nao pode auto-publicar */}
+        {!prepData.can_auto_publish && prepData.setup_needed?.length > 0 && (
+          <div className="p-3 bg-warning-muted border border-warning/20 rounded-xl">
+            <p className="text-[11px] font-semibold text-warning mb-2 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" /> Upload manual necessario
+            </p>
+            <ul className="text-[10px] text-content-3 space-y-1">
+              {prepData.setup_needed.map((s, i) => (
+                <li key={i} className="flex items-start gap-1.5"><span className="text-warning">→</span> {s}</li>
+              ))}
+            </ul>
+            {clip.clip_path && (
+              <a href={clip.clip_path} download className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-accent-muted text-accent-light rounded-lg text-[10px] font-medium hover:bg-accent/20">
+                <Download className="w-3 h-3" /> Baixar video pra postar manualmente
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Titulo */}
+        <div>
+          <label className="text-[10px] font-semibold text-content-3 uppercase tracking-wider block mb-1">Titulo</label>
+          <input value={editTitle} onChange={e => setEditTitle(e.target.value)}
+            className="w-full bg-surface-3 border border-stroke-2 rounded-lg px-3 py-2 text-xs text-content-1 outline-none focus:border-accent/50" />
+        </div>
+
+        {/* Descricao */}
+        <div>
+          <label className="text-[10px] font-semibold text-content-3 uppercase tracking-wider block mb-1">Descricao</label>
+          <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={3}
+            className="w-full bg-surface-3 border border-stroke-2 rounded-lg px-3 py-2 text-xs text-content-1 outline-none focus:border-accent/50 resize-y" />
+        </div>
+
+        {/* Tags */}
+        <div>
+          <label className="text-[10px] font-semibold text-content-3 uppercase tracking-wider block mb-1">Tags</label>
+          <input value={editTags} onChange={e => setEditTags(e.target.value)}
+            placeholder="#tag1, #tag2, #tag3"
+            className="w-full bg-surface-3 border border-stroke-2 rounded-lg px-3 py-2 text-xs text-content-1 placeholder-content-4 outline-none focus:border-accent/50" />
+        </div>
+
+        {/* Copiar tudo (pra upload manual) */}
+        <div className="flex gap-2 pt-1">
+          {prepData.can_auto_publish ? (
+            <Button icon={publishing ? Loader2 : Send} onClick={handleConfirmPublish}
+              className={publishing ? 'opacity-70 pointer-events-none' : ''}>
+              {publishing ? 'Publicando...' : 'Confirmar e publicar'}
+            </Button>
+          ) : (
+            <Button variant="secondary" icon={Copy} onClick={() => {
+              navigator.clipboard.writeText(`${editTitle}\n\n${editDesc}\n\n${editTags}`)
+              setResult({ status: 'copied' })
+            }}>
+              Copiar titulo + descricao + tags
+            </Button>
+          )}
+        </div>
+
+        {result?.status === 'copied' && (
+          <p className="text-[10px] text-success">✅ Copiado! Cole no YouTube Studio ao fazer upload manual.</p>
+        )}
+      </div>
+    )
+  }
+
+  // Step 4: Resultado
+  if (step === 'done') {
+    return (
+      <div className="space-y-3 py-4">
+        {result?.status === 'published' ? (
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-2xl bg-success-muted flex items-center justify-center mx-auto mb-3">
+              <Check className="w-6 h-6 text-success" />
+            </div>
+            <p className="text-sm font-semibold text-success">Publicado com sucesso!</p>
+            <p className="text-xs text-content-3 mt-1">O video foi enviado pra {prepData?.account_name}</p>
+          </div>
+        ) : (
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-2xl bg-danger-muted flex items-center justify-center mx-auto mb-3">
+              <AlertTriangle className="w-6 h-6 text-danger" />
+            </div>
+            <p className="text-sm font-semibold text-danger">Falha na publicacao</p>
+            <p className="text-xs text-content-3 mt-1">{result?.error}</p>
+          </div>
+        )}
+        <div className="text-center">
+          <Button size="sm" variant="secondary" onClick={() => { setStep('select'); setResult(null) }}>Tentar outra conta</Button>
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }
 
 function ClipDetailModal({ clip, onClose, onPublish, onRefresh }) {
@@ -198,33 +389,7 @@ function ClipDetailModal({ clip, onClose, onPublish, onRefresh }) {
 
               {/* PUBLISH TAB */}
               {tab === 'publish' && (
-                <div className="space-y-3">
-                  <p className="text-[10px] text-content-4">Escolha uma conta conectada pra publicar este video.</p>
-
-                  {accounts.filter(a => a.active).map(acc => (
-                    <button key={acc.id} onClick={() => handlePublishTo(acc.id)}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-3/30 hover:bg-surface-3 border border-stroke-1 hover:border-stroke-2 transition-all text-left">
-                      <span className="text-lg">{platformEmoji[acc.platform] || '📱'}</span>
-                      <div className="flex-1">
-                        <p className="text-xs font-medium text-content-1">{acc.name}</p>
-                        <p className="text-[10px] text-content-4">{acc.platform} · {acc.username}</p>
-                      </div>
-                      {publishing === acc.id && <Loader2 className="w-4 h-4 text-accent-light animate-spin" />}
-                      {!acc.has_credentials && <Badge variant="warning">Sem token</Badge>}
-                      {acc.has_credentials && publishing !== acc.id && <Badge variant="success" dot>Pronta</Badge>}
-                    </button>
-                  ))}
-
-                  {accounts.filter(a => a.active).length === 0 && (
-                    <p className="text-xs text-content-4 py-4 text-center">Nenhuma conta conectada. Va em Contas pra configurar.</p>
-                  )}
-
-                  {publishResult && (
-                    <div className={`p-3 rounded-xl text-xs ${publishResult.status === 'published' ? 'bg-success-muted text-success border border-success/20' : 'bg-danger-muted text-danger border border-danger/20'}`}>
-                      {publishResult.status === 'published' ? '✅ Publicado!' : `❌ ${publishResult.error}`}
-                    </div>
-                  )}
-                </div>
+                <PublishTab clip={clip} accounts={accounts} onPublished={() => onPublish(clip.id)} />
               )}
 
               {/* CLONE/REFAZER TAB */}

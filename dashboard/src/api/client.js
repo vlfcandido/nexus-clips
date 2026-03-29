@@ -24,6 +24,7 @@ export const generateClip = (data) => request('/clips/generate', { method: 'POST
 export const getClipComments = (id) => request(`/clips/${id}/comments`)
 export const addClipComment = (id, data) => request(`/clips/${id}/comments`, { method: 'POST', body: JSON.stringify(data) })
 export const cloneClip = (id, adjustments = '') => request(`/clips/${id}/clone`, { method: 'POST', body: JSON.stringify({ adjustments }) })
+export const preparePublish = (clipId, accountId) => request(`/clips/${clipId}/prepare-publish/${accountId}`, { method: 'POST' })
 
 // Templates visuais
 export const getTemplates = () => request('/templates')
