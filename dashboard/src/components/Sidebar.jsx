@@ -1,9 +1,10 @@
-import { LayoutDashboard, Film, Radio, TrendingUp, Settings, Sparkles, Pause, Play, Users, BarChart3, MessageSquare } from 'lucide-react'
+import { LayoutDashboard, Film, Radio, TrendingUp, Settings, Sparkles, Pause, Play, Users, BarChart3, MessageSquare, Wand2 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { pausePipeline, resumePipeline } from '../api/client'
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'studio', label: 'Studio', icon: Wand2 },
   { id: 'clips', label: 'Conteudos', icon: Film },
   { id: 'sources', label: 'Fontes', icon: Radio },
   { id: 'trending', label: 'Trending', icon: TrendingUp },

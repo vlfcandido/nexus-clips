@@ -6,11 +6,13 @@ import SourcesView from './components/SourcesView'
 import TrendingView from './components/TrendingView'
 import AccountsView from './components/AccountsView'
 import AnalyticsView from './components/AnalyticsView'
+import StudioView from './components/StudioView'
 import PromptsView from './components/PromptsView'
 import SettingsView from './components/SettingsView'
 
 const PAGES = {
   dashboard: Dashboard,
+  studio: StudioView,
   clips: ClipsView,
   sources: SourcesView,
   trending: TrendingView,
