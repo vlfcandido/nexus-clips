@@ -1,4 +1,4 @@
-import { LayoutDashboard, Film, Radio, TrendingUp, Settings, Sparkles, Pause, Play } from 'lucide-react'
+import { LayoutDashboard, Film, Radio, TrendingUp, Settings, Sparkles, Pause, Play, Users } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { pausePipeline, resumePipeline } from '../api/client'
 
@@ -7,6 +7,7 @@ const NAV = [
   { id: 'clips', label: 'Conteudos', icon: Film },
   { id: 'sources', label: 'Fontes', icon: Radio },
   { id: 'trending', label: 'Trending', icon: TrendingUp },
+  { id: 'accounts', label: 'Contas', icon: Users },
   { id: 'settings', label: 'Config', icon: Settings },
 ]
 

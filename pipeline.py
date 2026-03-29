@@ -105,7 +105,12 @@ class Pipeline:
         """Worker que processa conteúdo via grafo LangGraph."""
         log.info("pipeline.worker.started", worker=worker_id)
 
-        while self._running:
+        while True:
+            # Se pausado, espera sem processar (mas mantém loop vivo pra poder resumir)
+            if not self._running:
+                await asyncio.sleep(2)
+                continue
+
             try:
                 content = await asyncio.wait_for(self._queue.get(), timeout=5)
             except asyncio.TimeoutError:

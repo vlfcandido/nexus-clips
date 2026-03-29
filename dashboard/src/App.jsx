@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard'
 import ClipsView from './components/ClipsView'
 import SourcesView from './components/SourcesView'
 import TrendingView from './components/TrendingView'
+import AccountsView from './components/AccountsView'
 import SettingsView from './components/SettingsView'
 
 const PAGES = {
@@ -11,6 +12,7 @@ const PAGES = {
   clips: ClipsView,
   sources: SourcesView,
   trending: TrendingView,
+  accounts: AccountsView,
   settings: SettingsView,
 }
 

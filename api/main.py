@@ -15,7 +15,7 @@ from sqlalchemy import desc, func, select, update
 from config.logging import setup_logging
 from config.settings import settings
 from db.database import async_session, init_db
-from db.models import Clip, MonitoredSource
+from db.models import Clip, MonitoredSource, PublishAccount, PublishLog
 from detection.trending import get_all_trends
 from pipeline import Pipeline
 from strategy.scheduler import get_analytics_summary
@@ -45,8 +45,15 @@ app.mount("/media", StaticFiles(directory=str(settings.clips_output_dir)), name=
 @app.on_event("startup")
 async def startup():
     await init_db()
-    asyncio.create_task(pipeline.start())
-    log.info("api.started")
+    asyncio.create_task(_start_pipeline_paused())
+    log.info("api.started", pipeline="paused")
+
+
+async def _start_pipeline_paused():
+    """Inicia pipeline mas pausa imediatamente (user controla pelo dashboard)."""
+    await pipeline.start()
+    pipeline._running = False
+    log.info("pipeline.auto_paused")
 
 
 @app.on_event("shutdown")
@@ -387,3 +394,186 @@ async def pipeline_resume():
     log.info("api.pipeline.resume")
     pipeline._running = True
     return {"status": "resumed"}
+
+
+# ==================== ACCOUNTS (CONTAS) ====================
+
+class AccountCreate(BaseModel):
+    name: str
+    platform: str  # tiktok, instagram, youtube, twitter, telegram
+    username: str = ""
+    topics: list[str] = []
+    auto_publish: bool = False
+    max_posts_per_day: int = 5
+    api_key: str = ""
+    api_secret: str = ""
+    access_token: str = ""
+
+
+class AccountUpdate(BaseModel):
+    name: str | None = None
+    username: str | None = None
+    topics: list[str] | None = None
+    active: bool | None = None
+    auto_publish: bool | None = None
+    max_posts_per_day: int | None = None
+    api_key: str | None = None
+    api_secret: str | None = None
+    access_token: str | None = None
+
+
+@app.get("/api/accounts")
+async def list_accounts():
+    """Lista contas de publicação."""
+    from publisher.platform_specs import get_specs
+    async with async_session() as session:
+        result = await session.execute(select(PublishAccount).order_by(PublishAccount.id))
+        accounts = result.scalars().all()
+
+    return {
+        "accounts": [
+            {
+                "id": a.id,
+                "name": a.name,
+                "platform": a.platform,
+                "username": a.username,
+                "topics": json.loads(a.topics) if a.topics else [],
+                "active": a.active,
+                "auto_publish": a.auto_publish,
+                "max_posts_per_day": a.max_posts_per_day,
+                "total_posts": a.total_posts,
+                "total_views": a.total_views,
+                "total_followers": a.total_followers,
+                "has_credentials": bool(a.access_token or a.api_key),
+                "platform_specs": get_specs(a.platform),
+                "created_at": a.created_at.isoformat() if a.created_at else "",
+            }
+            for a in accounts
+        ]
+    }
+
+
+@app.post("/api/accounts")
+async def create_account(data: AccountCreate):
+    """Cria nova conta de publicação."""
+    log.info("api.accounts.create", name=data.name, platform=data.platform)
+
+    async with async_session() as session:
+        account = PublishAccount(
+            name=data.name,
+            platform=data.platform,
+            username=data.username,
+            topics=json.dumps(data.topics),
+            auto_publish=data.auto_publish,
+            max_posts_per_day=data.max_posts_per_day,
+            api_key=data.api_key,
+            api_secret=data.api_secret,
+            access_token=data.access_token,
+        )
+        session.add(account)
+        await session.commit()
+
+    return {"status": "created", "id": account.id}
+
+
+@app.patch("/api/accounts/{account_id}")
+async def update_account(account_id: int, data: AccountUpdate):
+    """Atualiza conta."""
+    async with async_session() as session:
+        account = await session.get(PublishAccount, account_id)
+        if not account:
+            raise HTTPException(404, "Conta nao encontrada")
+
+        if data.name is not None: account.name = data.name
+        if data.username is not None: account.username = data.username
+        if data.topics is not None: account.topics = json.dumps(data.topics)
+        if data.active is not None: account.active = data.active
+        if data.auto_publish is not None: account.auto_publish = data.auto_publish
+        if data.max_posts_per_day is not None: account.max_posts_per_day = data.max_posts_per_day
+        if data.api_key is not None: account.api_key = data.api_key
+        if data.api_secret is not None: account.api_secret = data.api_secret
+        if data.access_token is not None: account.access_token = data.access_token
+
+        await session.commit()
+        log.info("api.accounts.update", id=account_id)
+
+    return {"status": "updated"}
+
+
+@app.delete("/api/accounts/{account_id}")
+async def delete_account(account_id: int):
+    """Remove conta."""
+    async with async_session() as session:
+        account = await session.get(PublishAccount, account_id)
+        if not account:
+            raise HTTPException(404)
+        await session.delete(account)
+        await session.commit()
+        log.info("api.accounts.delete", id=account_id)
+
+    return {"status": "deleted"}
+
+
+@app.get("/api/accounts/{account_id}/log")
+async def account_publish_log(account_id: int, limit: int = 20):
+    """Histórico de publicações de uma conta."""
+    async with async_session() as session:
+        result = await session.execute(
+            select(PublishLog)
+            .where(PublishLog.account_id == account_id)
+            .order_by(desc(PublishLog.created_at))
+            .limit(limit)
+        )
+        logs = result.scalars().all()
+
+    return {
+        "logs": [
+            {
+                "id": l.id,
+                "clip_id": l.clip_id,
+                "platform": l.platform,
+                "status": l.status,
+                "post_url": l.post_url,
+                "published_at": l.published_at.isoformat() if l.published_at else None,
+                "views": l.views,
+                "likes": l.likes,
+                "error": l.error,
+            }
+            for l in logs
+        ]
+    }
+
+
+# ==================== PLATFORM SPECS ====================
+
+@app.get("/api/platforms")
+async def list_platforms():
+    """Retorna specs de todas as plataformas."""
+    from publisher.platform_specs import PLATFORM_SPECS
+    return {"platforms": PLATFORM_SPECS}
+
+
+@app.get("/api/clips/{clip_id}/compatibility")
+async def clip_compatibility(clip_id: int):
+    """Verifica compatibilidade de um clip com cada plataforma."""
+    from publisher.platform_specs import validate_clip_for_platform, get_all_platforms
+    import os
+
+    async with async_session() as session:
+        clip = await session.get(Clip, clip_id)
+        if not clip:
+            raise HTTPException(404)
+
+    file_size_mb = 0
+    if clip.clip_path:
+        full_path = str(settings.clips_output_dir / clip.clip_path.lstrip("/media/"))
+        if os.path.exists(full_path):
+            file_size_mb = os.path.getsize(full_path) / (1024 * 1024)
+
+    results = {}
+    for platform in get_all_platforms():
+        results[platform] = validate_clip_for_platform(
+            clip.duration_seconds, file_size_mb, platform
+        )
+
+    return {"clip_id": clip_id, "compatibility": results}

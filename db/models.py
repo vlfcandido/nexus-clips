@@ -47,6 +47,63 @@ class Clip(Base):
     shares: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class PublishAccount(Base):
+    """Conta de rede social pra publicação."""
+
+    __tablename__ = "publish_accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
+
+    # Identidade
+    name: Mapped[str] = mapped_column(String(100))  # "Guerra Agora", "Gol a Gol"
+    platform: Mapped[str] = mapped_column(String(20))  # tiktok, instagram, youtube, twitter
+    username: Mapped[str] = mapped_column(String(100), default="")  # @handle
+
+    # Tópicos que essa conta cobre
+    topics: Mapped[str] = mapped_column(Text, default="")  # JSON: ["guerra", "política"]
+
+    # Credenciais (encriptadas em prod)
+    api_key: Mapped[str] = mapped_column(Text, default="")
+    api_secret: Mapped[str] = mapped_column(Text, default="")
+    access_token: Mapped[str] = mapped_column(Text, default="")
+    refresh_token: Mapped[str] = mapped_column(Text, default="")
+
+    # Config
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    auto_publish: Mapped[bool] = mapped_column(Boolean, default=False)
+    max_posts_per_day: Mapped[int] = mapped_column(Integer, default=5)
+
+    # Métricas
+    total_posts: Mapped[int] = mapped_column(Integer, default=0)
+    total_views: Mapped[int] = mapped_column(Integer, default=0)
+    total_followers: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class PublishLog(Base):
+    """Log de publicações — rastreia cada post em cada plataforma."""
+
+    __tablename__ = "publish_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
+
+    clip_id: Mapped[int] = mapped_column(Integer)
+    account_id: Mapped[int] = mapped_column(Integer)
+    platform: Mapped[str] = mapped_column(String(20))
+    post_url: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, published, failed, scheduled
+    scheduled_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    error: Mapped[str] = mapped_column(Text, default="")
+
+    # Métricas do post individual
+    views: Mapped[int] = mapped_column(Integer, default=0)
+    likes: Mapped[int] = mapped_column(Integer, default=0)
+    comments: Mapped[int] = mapped_column(Integer, default=0)
+    shares: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class MonitoredSource(Base):
     """Fontes sendo monitoradas ativamente."""
 

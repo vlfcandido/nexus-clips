@@ -41,3 +41,14 @@ export const updateSettings = (data) => request('/settings', { method: 'PATCH', 
 export const getPipelineStatus = () => request('/pipeline/status')
 export const pausePipeline = () => request('/pipeline/pause', { method: 'POST' })
 export const resumePipeline = () => request('/pipeline/resume', { method: 'POST' })
+
+// Accounts
+export const getAccounts = () => request('/accounts')
+export const createAccount = (data) => request('/accounts', { method: 'POST', body: JSON.stringify(data) })
+export const updateAccount = (id, data) => request(`/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+export const deleteAccount = (id) => request(`/accounts/${id}`, { method: 'DELETE' })
+export const getAccountLog = (id) => request(`/accounts/${id}/log`)
+
+// Platforms
+export const getPlatforms = () => request('/platforms')
+export const getClipCompatibility = (id) => request(`/clips/${id}/compatibility`)
