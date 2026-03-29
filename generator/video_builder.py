@@ -84,10 +84,22 @@ async def generate_narrated_video(
     duration = await _audio_duration(voice_path)
     log.info("video_builder.duration", seconds=round(duration, 1))
 
-    # === 3. Imagens do contexto (IA gera queries específicas) ===
-    num_images = max(4, int(duration / SECONDS_PER_IMAGE))
-    images = await _fetch_images(topic, title, img_dir, count=min(num_images, 8), summary=summary)
-    log.info("video_builder.images", count=len(images), needed=num_images)
+    # === 3. Mídia do contexto (vídeos primeiro, fallback pra imagens) ===
+    videos = []
+    images = []
+    vid_dir = output_dir / "videos" / output_name
+    vid_dir.mkdir(parents=True, exist_ok=True)
+
+    # Tenta buscar vídeos de stock (mais impactante que imagens)
+    num_needed = max(3, int(duration / 5))  # ~1 video a cada 5s
+    videos = await _fetch_videos(topic, title, vid_dir, count=min(num_needed, 4), summary=summary)
+
+    # Se não achou vídeos suficientes, complementa com imagens
+    if len(videos) < 2:
+        num_images = max(4, int(duration / SECONDS_PER_IMAGE))
+        images = await _fetch_images(topic, title, img_dir, count=min(num_images, 8), summary=summary)
+
+    log.info("video_builder.media", videos=len(videos), images=len(images))
 
     # === 4. Legendas word-by-word (Whisper) ===
     subtitle_path = str(output_dir / "subs" / f"{output_name}.ass")
@@ -108,6 +120,7 @@ async def generate_narrated_video(
     ok = await _build_video_v3(
         video_path, voice_path, duration, title, summary, source, topic, images,
         subtitle_path=subtitle_path,
+        stock_videos=videos,
     )
     if not ok:
         return None
@@ -215,6 +228,55 @@ Return JSON: {{"queries": ["query1", "query2", "query3", "query4"]}}""",
         return [" ".join(words[:3]), topic]
 
 
+async def _fetch_videos(topic: str, title: str, out_dir: Path, count: int = 3, summary: str = "") -> list[str]:
+    """Busca vídeos portrait do Pexels (clips de stock)."""
+    api_key = settings.pexels_api_key
+    if not api_key:
+        return []
+
+    queries = await _generate_image_queries(title, summary, topic)
+    paths = []
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=30) as client:
+            for query in queries:
+                if len(paths) >= count:
+                    break
+                resp = await client.get(
+                    "https://api.pexels.com/videos/search",
+                    headers={"Authorization": api_key},
+                    params={"query": query, "per_page": 3, "orientation": "portrait"},
+                )
+                if resp.status_code != 200:
+                    continue
+                for video in resp.json().get("videos", []):
+                    if len(paths) >= count:
+                        break
+                    # Pega o melhor arquivo (720p+, portrait)
+                    files = video.get("video_files", [])
+                    best = sorted(
+                        [f for f in files if f.get("height", 0) >= 720],
+                        key=lambda f: f.get("height", 0),
+                    )
+                    if not best:
+                        best = sorted(files, key=lambda f: f.get("height", 0), reverse=True)
+                    if not best:
+                        continue
+                    url = best[0]["link"]
+                    vid_resp = await client.get(url, follow_redirects=True)
+                    if vid_resp.status_code == 200:
+                        p = str(out_dir / f"vid_{len(paths):02d}.mp4")
+                        Path(p).write_bytes(vid_resp.content)
+                        paths.append(p)
+                        log.info("pexels.video_downloaded", path=p, size=len(vid_resp.content))
+
+        log.info("pexels.videos_ok", count=len(paths))
+    except Exception as e:
+        log.warning("pexels.videos_error", error=str(e))
+    return paths
+
+
 async def _fetch_images(topic: str, title: str, out_dir: Path, count: int = 6, summary: str = "") -> list[str]:
     """Busca imagens portrait do Pexels com queries específicas geradas por IA."""
     api_key = settings.pexels_api_key
@@ -222,7 +284,6 @@ async def _fetch_images(topic: str, title: str, out_dir: Path, count: int = 6, s
         log.warning("pexels.no_key")
         return []
 
-    # Gera queries específicas pro conteúdo usando IA
     queries = await _generate_image_queries(title, summary, topic)
 
     paths = []
@@ -292,6 +353,7 @@ async def _build_video_v3(
     topic: str,
     images: list[str],
     subtitle_path: str | None = None,
+    stock_videos: list[str] | None = None,
 ) -> bool:
     """Monta vídeo com cortes rápidos, zoom, transições e overlays."""
     style = TOPIC_STYLE.get(topic, TOPIC_STYLE["guerra"])
@@ -301,6 +363,17 @@ async def _build_video_v3(
     safe_source = _esc(source or "Nexus Clips")
     wrapped = textwrap.fill(summary[:200], width=34)
     safe_summary = _esc(wrapped)
+
+    # Prioridade: stock videos > imagens > fallback simples
+    if stock_videos and len(stock_videos) >= 2:
+        ok = await _build_with_stock_videos(
+            video_path, voice_path, duration, safe_title, safe_summary,
+            safe_source, style, font, stock_videos, topic=topic,
+            subtitle_path=subtitle_path,
+        )
+        if ok:
+            return True
+        log.info("video_builder.stock_failed_fallback")
 
     if images and len(images) >= 2:
         ok = await _build_with_images(
@@ -316,6 +389,98 @@ async def _build_video_v3(
         video_path, voice_path, duration, safe_title, safe_summary,
         safe_source, style, font
     )
+
+
+async def _build_with_stock_videos(
+    video_path: str, voice_path: str, duration: float,
+    title: str, summary: str, source: str,
+    style: dict, font: str, stock_videos: list[str],
+    topic: str = "guerra", subtitle_path: str | None = None,
+) -> bool:
+    """Monta vídeo usando clips de stock do Pexels — cortes rápidos + overlays."""
+    n = len(stock_videos)
+    per_vid = duration / n
+    voice_idx = n
+    music_path = Path(__file__).parent.parent / "assets" / "music" / MUSIC_MAP.get(topic, "news.mp3")
+
+    inputs = []
+    filters = []
+
+    # Input de cada stock video (truncado pra duração necessária)
+    for i, sv in enumerate(stock_videos):
+        inputs.extend(["-t", str(round(per_vid, 2)), "-i", sv])
+
+    # Voice + music
+    inputs.extend(["-i", voice_path])
+    has_music = music_path.exists()
+    if has_music:
+        inputs.extend(["-i", str(music_path)])
+
+    # Scale + crop cada video pra 1080x1920 + fade
+    for i in range(n):
+        filters.append(
+            f"[{i}:v]scale=1080:1920:force_original_aspect_ratio=increase,"
+            f"crop=1080:1920,setsar=1,"
+            f"fade=t=in:st=0:d=0.3,fade=t=out:st={max(0, per_vid-0.3)}:d=0.3"
+            f"[v{i}]"
+        )
+
+    # Concat
+    concat_in = "".join(f"[v{i}]" for i in range(n))
+    filters.append(f"{concat_in}concat=n={n}:v=1:a=0[slideshow]")
+
+    # Text overlays
+    text_chain = (
+        f"[slideshow]drawbox=x=0:y=0:w=1080:h=420:c=black@0.65:t=fill,"
+        f"drawbox=x=0:y=0:w=1080:h=5:c={style['accent']}:t=fill,"
+        f"drawtext=text='{style.get('badge', 'NEWS')}':fontsize=26:fontcolor={style['accent']}:x=50:y=60:fontfile={font},"
+        f"drawbox=x=50:y=96:w=90:h=3:c={style['accent']}:t=fill,"
+        f"drawtext=text='{title}':fontsize=42:fontcolor=white:x=50:y=130:fontfile={font},"
+        f"drawbox=x=0:y=1820:w=1080:h=100:c=black@0.75:t=fill,"
+        f"drawbox=x=0:y=1916:w='(t/{duration})*1080':h=4:c={style['accent']}:t=fill,"
+        f"drawtext=text='{source}':fontsize=18:fontcolor=#aaaaaa:x=50:y=1850:fontfile={font},"
+        f"drawtext=text='NEXUS CLIPS':fontsize=14:fontcolor=#666666:x=900:y=1852:fontfile={font}"
+    )
+    if subtitle_path and Path(subtitle_path).exists():
+        sub_esc = subtitle_path.replace("'", "'\\''").replace(":", "\\:")
+        text_chain += f",subtitles='{sub_esc}'"
+    text_chain += "[vout]"
+    filters.append(text_chain)
+
+    # Audio mix
+    if has_music:
+        music_idx = voice_idx + 1
+        filters.append(
+            f"[{voice_idx}:a]volume=1.0[voice];"
+            f"[{music_idx}:a]volume=0.10,afade=t=in:d=1.5,afade=t=out:st={max(0,duration-2.5)}:d=2.5[bgm];"
+            f"[voice][bgm]amix=inputs=2:duration=shortest[aout]"
+        )
+        audio_map = "[aout]"
+    else:
+        audio_map = f"{voice_idx}:a"
+
+    fc = ";".join(filters)
+    cmd = [
+        "ffmpeg", "-y", *inputs,
+        "-filter_complex", fc,
+        "-map", "[vout]", "-map", audio_map,
+        "-c:v", "libx264", "-preset", "fast", "-crf", "22",
+        "-c:a", "aac", "-b:a", "192k",
+        "-shortest", "-movflags", "+faststart",
+        video_path,
+    ]
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        log.error("video_builder.stock_ffmpeg_err", stderr=stderr.decode()[-300:])
+        return False
+
+    log.info("video_builder.stock_video_ok", clips=n)
+    return True
 
 
 async def _build_with_images(

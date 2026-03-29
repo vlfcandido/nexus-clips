@@ -190,6 +190,39 @@ REGRAS:
         "temperature": 0.6,
         "max_tokens": 400,
     },
+    {
+        "key": "scriptwriter",
+        "name": "Redator / Roteirista",
+        "description": "Escreve o roteiro completo do video com inicio, meio e fim. Garante contexto e narrativa.",
+        "system_prompt": "Voce e um redator de conteudo digital brasileiro. Escreve roteiros curtos pra videos virais. Cada video precisa ter INICIO (gancho), MEIO (desenvolvimento) e FIM (conclusao/CTA). Responda em JSON.",
+        "user_prompt_template": """Escreva um roteiro completo pra este video:
+
+Titulo: {title}
+Resumo: {summary}
+Topico: {topic}
+Categoria: {category}
+Duracao alvo: {duration}s
+Tom: {mood}
+
+JSON: {{
+    "hook": "frase de abertura que prende nos primeiros 3 segundos (pergunta, numero chocante, ou provocacao)",
+    "intro": "contextualizacao rapida do assunto (10-15% do tempo)",
+    "body": "desenvolvimento principal com fatos, dados ou historia (60-70% do tempo)",
+    "climax": "momento de maior impacto ou revelacao (10-15% do tempo)",
+    "outro": "conclusao + call to action (segue, comenta, compartilha)",
+    "full_narration": "texto completo pra narrar, juntando tudo numa fala natural e fluida"
+}}
+
+REGRAS:
+- Portugues BR natural, como se falasse pra camera
+- INICIO: gancho forte, curiosidade, urgencia
+- MEIO: fatos concretos, numeros, contexto
+- FIM: opiniao ou CTA que gera engajamento
+- Frases curtas e diretas
+- Tom adequado ao tema""",
+        "temperature": 0.6,
+        "max_tokens": 600,
+    },
 ]
 
 

@@ -335,13 +335,18 @@ async def generate_video_node(state: ContentState) -> dict:
     try:
         from config.prompts import get_prompt
         from config.llm import llm_json
-        prompt_cfg = await get_prompt("narration")
+        # Tenta redator (roteiro completo) primeiro, fallback pra narração simples
+        prompt_cfg = await get_prompt("scriptwriter")
+        if not prompt_cfg or not prompt_cfg.user_template:
+            prompt_cfg = await get_prompt("narration")
 
         template_vars = {
             "title": state.get("suggested_title", ""),
             "summary": state.get("summary", ""),
             "topic": state.get("topic", ""),
             "category": state.get("category", ""),
+            "duration": state.get("duration_target", 30),
+            "mood": state.get("voice_style", "urgente"),
         }
         try:
             user_text = prompt_cfg.user_template.format(**template_vars)
@@ -354,8 +359,9 @@ async def generate_video_node(state: ContentState) -> dict:
             temperature=prompt_cfg.temperature,
             max_tokens=prompt_cfg.max_tokens,
         )
-        narration = result.get("narration", "")
-        hook_from_ai = result.get("hook_opening", "")
+        # Redator retorna full_narration, narrador retorna narration
+        narration = result.get("full_narration", "") or result.get("narration", "")
+        hook_from_ai = result.get("hook", "") or result.get("hook_opening", "")
         if hook_from_ai and narration and not narration.startswith(hook_from_ai):
             narration = f"{hook_from_ai} {narration}"
 
