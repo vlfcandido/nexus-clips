@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Film, Upload, Trash2, ExternalLink, Eye, Clock, Play, X, Copy, Send, Calendar, ChevronDown } from 'lucide-react'
+import { Film, Upload, Trash2, ExternalLink, Eye, Clock, Play, X, Copy, Send, Maximize2 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { publishClip, deleteClip } from '../api/client'
 import Button from './ui/Button'
@@ -21,65 +21,96 @@ const CAT_EMOJI = {
 }
 
 function ClipDetailModal({ clip, onClose, onPublish }) {
+  const [fullscreen, setFullscreen] = useState(false)
+
   if (!clip) return null
 
+  // Fullscreen video mode
+  if (fullscreen) {
+    return (
+      <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center animate-fade" onClick={() => setFullscreen(false)}>
+        <video
+          src={clip.clip_path}
+          controls
+          autoPlay
+          className="max-h-screen max-w-screen"
+          onClick={e => e.stopPropagation()}
+        />
+        <button onClick={() => setFullscreen(false)}
+          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade" onClick={onClose}>
-      <div className="bg-surface-2 border border-stroke-1 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden animate-scale-in shadow-2xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade" onClick={onClose}>
+      <div className="bg-surface-2 border border-stroke-1 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden animate-scale-in shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-stroke-1">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-stroke-1">
           <div className="flex items-center gap-2">
             <span>{CAT_EMOJI[clip.category] || '📎'}</span>
             <Badge variant={TOPIC_VARIANT[clip.topic] || 'default'}>{clip.topic}</Badge>
             <Badge>{clip.category}</Badge>
             {clip.published && <Badge variant="success" dot>Publicado</Badge>}
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-surface-4 flex items-center justify-center text-content-4 hover:text-content-2 transition-colors">
+          <button onClick={onClose} className="w-7 h-7 rounded-lg hover:bg-surface-4 flex items-center justify-center text-content-4 hover:text-content-2">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="flex">
-          {/* Video side */}
-          <div className="w-[240px] flex-shrink-0 bg-black flex items-center justify-center">
+          {/* Video — grande */}
+          <div className="w-[360px] flex-shrink-0 bg-black flex items-center justify-center relative group">
             {clip.clip_path ? (
-              <VideoPlayer src={clip.clip_path} className="w-full" />
+              <>
+                <video
+                  src={clip.clip_path}
+                  controls
+                  autoPlay
+                  className="w-full max-h-[70vh] object-contain"
+                />
+                {/* Fullscreen button */}
+                <button
+                  onClick={() => setFullscreen(true)}
+                  className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-black/50 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Tela cheia"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+              </>
             ) : (
               <div className="w-full aspect-[9/16] flex items-center justify-center">
-                <Play className="w-8 h-8 text-content-4" />
+                <Play className="w-10 h-10 text-content-4" />
               </div>
             )}
           </div>
 
           {/* Detail side */}
-          <div className="flex-1 p-5 overflow-y-auto max-h-[60vh]">
+          <div className="flex-1 p-5 overflow-y-auto max-h-[70vh]">
             <h3 className="text-sm font-semibold text-content-1 mb-1">{clip.caption || clip.moment_text}</h3>
-            <p className="text-xs text-content-3 mb-4">{clip.moment_text}</p>
+            <p className="text-xs text-content-3 mb-4 leading-relaxed">{clip.moment_text}</p>
 
-            {/* Metadata grid */}
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <div className="bg-surface-3 rounded-lg p-3">
-                <p className="text-[10px] text-content-4 uppercase tracking-wider mb-1">Duracao</p>
-                <p className="text-sm font-mono text-content-1">{clip.duration_seconds}s</p>
-              </div>
-              <div className="bg-surface-3 rounded-lg p-3">
-                <p className="text-[10px] text-content-4 uppercase tracking-wider mb-1">Fonte</p>
-                <p className="text-sm text-content-1">{clip.source_type}</p>
-              </div>
-              <div className="bg-surface-3 rounded-lg p-3">
-                <p className="text-[10px] text-content-4 uppercase tracking-wider mb-1">Views</p>
-                <p className="text-sm font-mono text-content-1">{clip.views.toLocaleString('pt-BR')}</p>
-              </div>
-              <div className="bg-surface-3 rounded-lg p-3">
-                <p className="text-[10px] text-content-4 uppercase tracking-wider mb-1">Likes</p>
-                <p className="text-sm font-mono text-content-1">{clip.likes.toLocaleString('pt-BR')}</p>
-              </div>
+            {/* Metadata */}
+            <div className="grid grid-cols-2 gap-2 mb-5">
+              {[
+                { l: 'Duracao', v: `${clip.duration_seconds}s` },
+                { l: 'Fonte', v: clip.source_type },
+                { l: 'Views', v: clip.views.toLocaleString('pt-BR') },
+                { l: 'Likes', v: clip.likes.toLocaleString('pt-BR') },
+              ].map(({ l, v }) => (
+                <div key={l} className="bg-surface-3 rounded-lg p-2.5">
+                  <p className="text-[9px] text-content-4 uppercase tracking-wider">{l}</p>
+                  <p className="text-xs font-mono text-content-1 mt-0.5">{v}</p>
+                </div>
+              ))}
             </div>
 
             {/* Hashtags */}
             {clip.hashtags && (
-              <div className="mb-5">
-                <p className="text-[10px] text-content-4 uppercase tracking-wider mb-2">Hashtags</p>
+              <div className="mb-4">
+                <p className="text-[9px] text-content-4 uppercase tracking-wider mb-1.5">Hashtags</p>
                 <div className="flex flex-wrap gap-1">
                   {clip.hashtags.split(' ').filter(Boolean).map((h, i) => (
                     <Badge key={i} variant="accent">{h}</Badge>
@@ -88,11 +119,11 @@ function ClipDetailModal({ clip, onClose, onPublish }) {
               </div>
             )}
 
-            {/* Published URLs */}
+            {/* Links */}
             {clip.published && (clip.tiktok_url || clip.instagram_url || clip.twitter_url || clip.youtube_url) && (
-              <div className="mb-5">
-                <p className="text-[10px] text-content-4 uppercase tracking-wider mb-2">Links publicados</p>
-                <div className="space-y-1.5">
+              <div className="mb-4">
+                <p className="text-[9px] text-content-4 uppercase tracking-wider mb-1.5">Publicado em</p>
+                <div className="space-y-1">
                   {[
                     { url: clip.tiktok_url, label: 'TikTok' },
                     { url: clip.instagram_url, label: 'Instagram' },
@@ -108,9 +139,9 @@ function ClipDetailModal({ clip, onClose, onPublish }) {
             )}
 
             {/* Actions */}
-            <div className="flex gap-2 pt-2 border-t border-stroke-1">
+            <div className="flex flex-wrap gap-2 pt-3 border-t border-stroke-1">
               {!clip.published && (
-                <Button icon={Send} onClick={() => onPublish(clip.id)}>Publicar agora</Button>
+                <Button icon={Send} onClick={() => onPublish(clip.id)}>Publicar</Button>
               )}
               <Button variant="secondary" icon={Copy} onClick={() => navigator.clipboard.writeText(clip.caption || clip.moment_text)}>
                 Copiar texto
