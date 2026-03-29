@@ -175,6 +175,49 @@ async def list_clips(
     }
 
 
+class ManualClipCreate(BaseModel):
+    text: str  # Texto/notícia que Pedro quer transformar em vídeo
+    topic: str = "guerra"  # guerra, futebol, política, entretenimento
+    voice: str = "pt-BR-AntonioNeural"
+    source: str = "Manual"
+
+
+@app.post("/api/clips/generate")
+async def generate_clip_manual(data: ManualClipCreate):
+    """Gera um clip manualmente — Pedro escolhe o texto e as opções."""
+    log.info("api.clips.generate_manual", topic=data.topic, chars=len(data.text))
+
+    from agents.graph import process_content
+
+    try:
+        result = await process_content(
+            source_type="manual",
+            source_id=f"manual-{int(dt.datetime.utcnow().timestamp())}",
+            source_url="",
+            source_text=data.text,
+            source_author=data.source,
+        )
+
+        clip_id = result.get("db_clip_id")
+        if clip_id:
+            return {
+                "status": "ok",
+                "clip_id": clip_id,
+                "clip_path": result.get("clip_path", ""),
+                "topic": result.get("topic", ""),
+                "category": result.get("category", ""),
+                "summary": result.get("summary", ""),
+            }
+        else:
+            return {
+                "status": "skipped",
+                "reason": result.get("skip_reason", "Conteúdo não foi considerado relevante pela IA"),
+            }
+    except Exception as e:
+        log.error("api.clips.generate_error", error=str(e))
+        raise HTTPException(500, f"Erro ao gerar: {str(e)}")
+
+
 @app.post("/api/clips/{clip_id}/publish")
 async def publish_clip(clip_id: int):
     """Publica um clip manualmente."""

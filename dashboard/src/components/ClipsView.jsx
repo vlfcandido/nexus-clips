@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Film, Upload, Trash2, ExternalLink, Eye, Clock, Play, X, Copy, Send, Maximize2 } from 'lucide-react'
+import { Film, Upload, Trash2, ExternalLink, Eye, Clock, Play, X, Copy, Send, Maximize2, Plus, Loader2, Sparkles } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { publishClip, deleteClip } from '../api/client'
+import { publishClip, deleteClip, generateClip } from '../api/client'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
-import Card from './ui/Card'
+import Card, { CardHeader } from './ui/Card'
+import { Input, Select } from './ui/Input'
 import EmptyState from './ui/EmptyState'
 import VideoPlayer, { VideoThumbnail } from './ui/VideoPlayer'
 
@@ -159,6 +160,112 @@ function ClipDetailModal({ clip, onClose, onPublish }) {
   )
 }
 
+function CreateClipForm({ onCreated }) {
+  const [open, setOpen] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [result, setResult] = useState(null)
+  const [form, setForm] = useState({
+    text: '',
+    topic: 'guerra',
+    voice: 'pt-BR-AntonioNeural',
+    source: '',
+  })
+
+  const VOICES = [
+    { value: 'pt-BR-AntonioNeural', label: 'Antonio (narrador masculino)' },
+    { value: 'pt-BR-FranciscaNeural', label: 'Francisca (feminina natural)' },
+    { value: 'pt-BR-HumbertoNeural', label: 'Humberto (formal masculino)' },
+    { value: 'pt-BR-ThalitaNeural', label: 'Thalita (jovem feminina)' },
+    { value: 'pt-BR-MacerioNeural', label: 'Macerio (jovem masculino)' },
+  ]
+
+  async function handleGenerate() {
+    if (!form.text.trim()) return
+    setGenerating(true)
+    setResult(null)
+    try {
+      const res = await generateClip(form)
+      setResult(res)
+      if (res.status === 'ok') {
+        setTimeout(() => { onCreated(); setOpen(false); setResult(null); setForm({ ...form, text: '', source: '' }) }, 2000)
+      }
+    } catch (e) {
+      setResult({ status: 'error', reason: e.message })
+    }
+    setGenerating(false)
+  }
+
+  if (!open) {
+    return (
+      <Button icon={Plus} onClick={() => setOpen(true)}>Criar conteudo</Button>
+    )
+  }
+
+  return (
+    <Card className="animate-in-fast">
+      <div className="flex items-center justify-between mb-4">
+        <CardHeader title="Criar conteudo manualmente" subtitle="gerador" />
+        <button onClick={() => { setOpen(false); setResult(null) }} className="text-content-4 hover:text-content-2">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <label className="block text-[11px] font-medium text-content-3 mb-1.5">Texto / Noticia</label>
+          <textarea
+            value={form.text}
+            onChange={e => setForm({ ...form, text: e.target.value })}
+            placeholder="Cole aqui a noticia, texto ou ideia que quer transformar em video..."
+            rows={4}
+            className="w-full bg-surface-3 border border-stroke-2 rounded-lg px-3 py-2 text-sm text-content-1 placeholder-content-4 outline-none focus:border-accent/50 resize-y"
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <Select label="Topico" value={form.topic} onChange={e => setForm({ ...form, topic: e.target.value })}>
+            <option value="guerra">Guerra</option>
+            <option value="futebol">Futebol</option>
+            <option value="política">Politica</option>
+            <option value="entretenimento">Entretenimento</option>
+          </Select>
+          <Select label="Voz" value={form.voice} onChange={e => setForm({ ...form, voice: e.target.value })}>
+            {VOICES.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
+          </Select>
+          <Input label="Fonte (opcional)" placeholder="BBC, G1..." value={form.source}
+            onChange={e => setForm({ ...form, source: e.target.value })} />
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <Button icon={generating ? Loader2 : Sparkles} onClick={handleGenerate}
+            className={generating ? 'opacity-70 pointer-events-none' : ''}>
+            {generating ? 'Gerando video...' : 'Gerar video'}
+          </Button>
+          <Button variant="secondary" onClick={() => { setOpen(false); setResult(null) }}>Cancelar</Button>
+
+          {generating && (
+            <span className="text-[10px] text-content-4 animate-pulse">
+              Gerando voz + buscando imagens + montando video... pode levar 30-60s
+            </span>
+          )}
+        </div>
+
+        {result && (
+          <div className={`p-3 rounded-lg text-xs ${
+            result.status === 'ok' ? 'bg-success-muted text-success' :
+            result.status === 'skipped' ? 'bg-warning-muted text-warning' :
+            'bg-danger-muted text-danger'
+          }`}>
+            {result.status === 'ok' && <p>Video gerado! Clip #{result.clip_id} — {result.topic} / {result.category}</p>}
+            {result.status === 'skipped' && <p>Conteudo pulado: {result.reason}</p>}
+            {result.status === 'error' && <p>Erro: {result.reason}</p>}
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}
+
 export default function ClipsView() {
   const { state, dispatch, refresh } = useApp()
   const [filter, setFilter] = useState('all')
@@ -189,15 +296,17 @@ export default function ClipsView() {
           <h1 className="text-xl font-bold text-content-1 tracking-tight">Conteudos</h1>
           <p className="text-xs text-content-3 mt-1">{state.clipsTotal} conteudos gerados pelo pipeline</p>
         </div>
-        <div className="flex bg-surface-2 border border-stroke-1 rounded-xl p-[3px]">
-          {['all', 'pending', 'published'].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
-                filter === f ? 'bg-surface-4 text-content-1 shadow-sm' : 'text-content-4 hover:text-content-3'
-              }`}
-            >
-              {f === 'all' ? 'Todos' : f === 'pending' ? 'Pendentes' : 'Publicados'}
-            </button>
+        <div className="flex items-center gap-3">
+          <CreateClipForm onCreated={refresh} />
+          <div className="flex bg-surface-2 border border-stroke-1 rounded-xl p-[3px]">
+            {['all', 'pending', 'published'].map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
+                  filter === f ? 'bg-surface-4 text-content-1 shadow-sm' : 'text-content-4 hover:text-content-3'
+                }`}
+              >
+                {f === 'all' ? 'Todos' : f === 'pending' ? 'Pendentes' : 'Publicados'}
+              </button>
           ))}
         </div>
       </div>

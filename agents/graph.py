@@ -99,9 +99,10 @@ def should_process(state: ContentState) -> str:
     if len(_processed_ids) > 5000:
         _processed_ids.clear()
 
-    # Viralidade mínima
+    # Viralidade mínima (skip pra conteúdo manual — source_type="manual")
     virality = state.get("virality_score", 0)
-    if virality < MIN_VIRALITY_FOR_VIDEO:
+    is_manual = state.get("source_type") == "manual"
+    if not is_manual and virality < MIN_VIRALITY_FOR_VIDEO:
         log.info("graph.skip", reason="low_virality", virality=virality, min=MIN_VIRALITY_FOR_VIDEO, uid=uid)
         return "skip"
 
