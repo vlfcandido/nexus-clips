@@ -348,3 +348,30 @@ async def update_settings(data: SettingsUpdate):
         settings.moment_confidence_threshold = data.moment_confidence_threshold
 
     return {"status": "updated"}
+
+
+# ==================== PIPELINE CONTROL ====================
+
+@app.get("/api/pipeline/status")
+async def pipeline_status():
+    """Status do pipeline."""
+    return {
+        "running": pipeline._running,
+        "stats": pipeline.stats,
+    }
+
+
+@app.post("/api/pipeline/pause")
+async def pipeline_pause():
+    """Pausa o pipeline (para de processar fila)."""
+    log.info("api.pipeline.pause")
+    pipeline._running = False
+    return {"status": "paused"}
+
+
+@app.post("/api/pipeline/resume")
+async def pipeline_resume():
+    """Resume o pipeline."""
+    log.info("api.pipeline.resume")
+    pipeline._running = True
+    return {"status": "resumed"}

@@ -36,3 +36,8 @@ export const getAnalytics = () => request('/analytics')
 // Settings
 export const getSettings = () => request('/settings')
 export const updateSettings = (data) => request('/settings', { method: 'PATCH', body: JSON.stringify(data) })
+
+// Pipeline control
+export const getPipelineStatus = () => request('/pipeline/status')
+export const pausePipeline = () => request('/pipeline/pause', { method: 'POST' })
+export const resumePipeline = () => request('/pipeline/resume', { method: 'POST' })
