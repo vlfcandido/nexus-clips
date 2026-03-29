@@ -166,6 +166,30 @@ Return JSON: {{"queries": ["query1", "query2", "query3", "query4"]}}""",
         "temperature": 0.3,
         "max_tokens": 150,
     },
+    {
+        "key": "narration",
+        "name": "Texto de narracao",
+        "description": "Gera o texto que sera narrado no video. Controla tom, estilo, duracao da fala.",
+        "system_prompt": "Voce e um narrador de noticias brasileiro. Escreva texto pra ser falado em voz alta. Responda APENAS em JSON.",
+        "user_prompt_template": """Escreva um texto de narracao pra este video:
+
+Titulo: {title}
+Resumo: {summary}
+Topico: {topic}
+Categoria: {category}
+
+JSON: {{"narration": "texto completo pra narrar (60-120 palavras, tom urgente e envolvente)", "hook_opening": "frase de abertura impactante (2-3 segundos)"}}
+
+REGRAS:
+- Portugues BR natural, como se fosse falando pra camera
+- Comece com gancho que prende atencao
+- Tom urgente pra guerra/breaking, empolgante pra futebol, analitico pra politica
+- Frases curtas e diretas
+- Sem termos tecnicos
+- 60-120 palavras no total""",
+        "temperature": 0.6,
+        "max_tokens": 400,
+    },
 ]
 
 

@@ -632,6 +632,10 @@ async def update_prompt(prompt_id: int, data: PromptUpdate):
         await session.commit()
         log.info("api.prompts.update", id=prompt_id, key=prompt.key)
 
+    # Limpa cache pra pipeline usar prompt atualizado
+    from config.prompts import clear_cache
+    clear_cache()
+
     return {"status": "updated"}
 
 

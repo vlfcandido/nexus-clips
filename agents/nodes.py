@@ -68,36 +68,23 @@ async def classify_node(state: ContentState) -> dict:
     start = time.monotonic()
     log.info("node.classify.start", uid=uid)
 
-    llm = get_llm(temperature=0.1)
-    parser = JsonOutputParser()
+    # Carrega prompt do DB (editavel pelo Pedro no frontend)
+    from config.prompts import get_prompt
+    prompt_cfg = await get_prompt("classify")
 
-    # CONCEITO LANGCHAIN: Chain com pipe operator (|)
-    # LLM | Parser = o output do LLM vai direto pro parser
+    llm = get_llm(temperature=prompt_cfg.temperature)
+    parser = JsonOutputParser()
     chain = llm | parser
 
+    context = f"Texto: {state.get('source_text', '')}\nFonte: {state.get('source_type', '')}\nAutor: {state.get('source_author', '')}"
+    try:
+        user_text = prompt_cfg.user_template.format(context=context)
+    except (KeyError, IndexError):
+        user_text = f"{context}\n\n{prompt_cfg.user_template}"
+
     messages = [
-        SystemMessage(content="""Você é um classificador de conteúdo de mídia brasileira.
-Analise o conteúdo e classifique. Responda APENAS em JSON válido."""),
-        HumanMessage(content=f"""Classifique este conteúdo:
-
-Texto: {state.get('source_text', '')}
-Fonte: {state.get('source_type', '')}
-Autor: {state.get('source_author', '')}
-
-JSON esperado:
-{{
-    "is_relevant": true/false,
-    "category": "gol|polêmica|declaração|treta|análise|breaking|humor",
-    "topic": "guerra|futebol|política|entretenimento",
-    "virality_score": 0-10,
-    "urgency": "high|medium|low",
-    "summary": "resumo em 1 frase",
-    "suggested_title": "título chamativo",
-    "confidence": 0.0-1.0
-}}
-
-Critérios de relevância: notícias de guerra, gols, polêmicas políticas, breaking news.
-Virality 7+: evento ao vivo, polêmica explosiva, declaração viral."""),
+        SystemMessage(content=prompt_cfg.system_prompt),
+        HumanMessage(content=user_text),
     ]
 
     try:
@@ -142,40 +129,31 @@ async def strategize_node(state: ContentState) -> dict:
     start = time.monotonic()
     log.info("node.strategize.start", uid=uid, topic=state.get("topic"))
 
-    llm = get_llm(temperature=0.4)
+    from config.prompts import get_prompt
+    prompt_cfg = await get_prompt("strategy")
+
+    llm = get_llm(temperature=prompt_cfg.temperature)
     parser = JsonOutputParser()
     chain = llm | parser
 
     has_video = bool(state.get("source_media_url"))
+    template_vars = {
+        "category": state.get("category", ""),
+        "topic": state.get("topic", ""),
+        "virality_score": state.get("virality_score", 0),
+        "urgency": state.get("urgency", "low"),
+        "summary": state.get("summary", ""),
+        "has_video": str(has_video),
+        "source_type": state.get("source_type", ""),
+    }
+    try:
+        user_text = prompt_cfg.user_template.format(**template_vars)
+    except (KeyError, IndexError):
+        user_text = str(template_vars)
 
     messages = [
-        SystemMessage(content="""Você é um estrategista de conteúdo viral brasileiro.
-Maximize views e receita. Considere plataforma, formato, horário, voz, anti-strike.
-Responda APENAS em JSON válido."""),
-        HumanMessage(content=f"""Defina a estratégia pra este conteúdo:
-
-Resumo: {state.get('summary', '')}
-Categoria: {state.get('category', '')}
-Tópico: {state.get('topic', '')}
-Viralidade: {state.get('virality_score', 0)}/10
-Urgência: {state.get('urgency', 'low')}
-Tem vídeo: {has_video}
-Fonte: {state.get('source_type', '')}
-
-JSON esperado:
-{{
-    "format_type": "clip|narrated_news|original_video|meme|thread",
-    "duration_target": 30-120,
-    "primary_platform": "tiktok|instagram|youtube|twitter",
-    "secondary_platforms": ["..."],
-    "use_voice": true/false,
-    "voice_style": "narrador|informal|urgente|humoristico",
-    "needs_anti_strike": true/false,
-    "optimal_post_time": "HH:MM",
-    "estimated_views": 1000-500000,
-    "estimated_revenue": 0.0,
-    "reasoning": "explicação curta"
-}}"""),
+        SystemMessage(content=prompt_cfg.system_prompt),
+        HumanMessage(content=user_text),
     ]
 
     try:
