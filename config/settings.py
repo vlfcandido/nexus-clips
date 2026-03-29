@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     # Segundos depois do momento detectado
     clip_post_buffer: int = 50
 
+    # --- Cadência ---
+    min_virality_for_video: int = 6  # Só gera vídeo se viralidade >= este valor
+    max_videos_per_hour: int = 5  # Máximo de vídeos por hora
+
     # --- Whisper ---
     whisper_model: str = "base"  # tiny, base, small, medium, large
 

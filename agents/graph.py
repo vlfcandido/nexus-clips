@@ -62,29 +62,50 @@ from config.settings import settings
 log = structlog.get_logger()
 
 
-def should_process(state: ContentState) -> str:
-    """Função de decisão: o conteúdo vale processar?
+# Deduplicação: guarda source_ids já processados (in-memory)
+_processed_ids: set[str] = set()
 
-    CONCEITO LANGGRAPH:
-    - Conditional edges usam uma função que retorna o nome do próximo nó
-    - Permite branching dinâmico no grafo
-    - Retorna string = nome do nó destino
+# Cadência: máximo de vídeos por hora
+MIN_VIRALITY_FOR_VIDEO = 6  # Só gera vídeo se viralidade >= 6
+
+
+def should_process(state: ContentState) -> str:
+    """Decide se o conteúdo vale processar.
+
+    Filtros:
+    1. É relevante? (IA classificou como relevante)
+    2. Confiança mínima? (threshold configurável)
+    3. Já foi processado? (deduplicação por source_id)
+    4. Viralidade mínima? (só alto engajamento potencial)
     """
+    uid = state.get("uid", "")
+
     if not state.get("is_relevant", False):
-        log.info("graph.skip", reason="not_relevant", uid=state.get("uid", ""))
+        log.info("graph.skip", reason="not_relevant", uid=uid)
         return "skip"
 
     confidence = state.get("classification_confidence", 0)
     if confidence < settings.moment_confidence_threshold:
-        log.info(
-            "graph.skip",
-            reason="low_confidence",
-            confidence=confidence,
-            threshold=settings.moment_confidence_threshold,
-            uid=state.get("uid", ""),
-        )
+        log.info("graph.skip", reason="low_confidence", confidence=confidence, uid=uid)
         return "skip"
 
+    # Deduplicação
+    source_id = state.get("source_id", "")
+    if source_id in _processed_ids:
+        log.info("graph.skip", reason="duplicate", source_id=source_id, uid=uid)
+        return "skip"
+    _processed_ids.add(source_id)
+    # Limita memória
+    if len(_processed_ids) > 5000:
+        _processed_ids.clear()
+
+    # Viralidade mínima
+    virality = state.get("virality_score", 0)
+    if virality < MIN_VIRALITY_FOR_VIDEO:
+        log.info("graph.skip", reason="low_virality", virality=virality, min=MIN_VIRALITY_FOR_VIDEO, uid=uid)
+        return "skip"
+
+    log.info("graph.process", uid=uid, virality=virality, confidence=confidence)
     return "process"
 
 

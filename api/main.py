@@ -324,6 +324,8 @@ async def get_settings():
         "publish_platforms": settings.publish_platforms,
         "monitor_topics": settings.monitor_topics,
         "moment_confidence_threshold": settings.moment_confidence_threshold,
+        "min_virality_for_video": settings.min_virality_for_video,
+        "max_videos_per_hour": settings.max_videos_per_hour,
         "whisper_model": settings.whisper_model,
         "default_clip_duration": settings.default_clip_duration,
     }
@@ -333,6 +335,8 @@ class SettingsUpdate(BaseModel):
     auto_publish: bool | None = None
     monitor_topics: list[str] | None = None
     moment_confidence_threshold: float | None = None
+    min_virality_for_video: int | None = None
+    max_videos_per_hour: int | None = None
 
 
 @app.patch("/api/settings")
@@ -346,6 +350,14 @@ async def update_settings(data: SettingsUpdate):
         settings.monitor_topics = data.monitor_topics
     if data.moment_confidence_threshold is not None:
         settings.moment_confidence_threshold = data.moment_confidence_threshold
+    if data.min_virality_for_video is not None:
+        settings.min_virality_for_video = data.min_virality_for_video
+        # Atualiza também no grafo
+        from agents.graph import MIN_VIRALITY_FOR_VIDEO
+        import agents.graph
+        agents.graph.MIN_VIRALITY_FOR_VIDEO = data.min_virality_for_video
+    if data.max_videos_per_hour is not None:
+        settings.max_videos_per_hour = data.max_videos_per_hour
 
     return {"status": "updated"}
 

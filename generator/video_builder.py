@@ -83,9 +83,25 @@ async def generate_narrated_video(
     images = await _fetch_images(topic, title, img_dir, count=min(num_images, 8), summary=summary)
     log.info("video_builder.images", count=len(images), needed=num_images)
 
-    # === 4. Montar vídeo ===
+    # === 4. Legendas word-by-word (Whisper) ===
+    subtitle_path = str(output_dir / "subs" / f"{output_name}.ass")
+    Path(subtitle_path).parent.mkdir(parents=True, exist_ok=True)
+    try:
+        from generator.subtitles import generate_word_subtitles
+        style = TOPIC_STYLE.get(topic, TOPIC_STYLE["guerra"])
+        await generate_word_subtitles(
+            voice_path, subtitle_path,
+            accent_color="#FFFFFF",
+            highlight_color=style["accent"],
+        )
+    except Exception as e:
+        log.warning("video_builder.subtitles_failed", error=str(e))
+        subtitle_path = None
+
+    # === 5. Montar vídeo ===
     ok = await _build_video_v3(
-        video_path, voice_path, duration, title, summary, source, topic, images
+        video_path, voice_path, duration, title, summary, source, topic, images,
+        subtitle_path=subtitle_path,
     )
     if not ok:
         return None
@@ -259,6 +275,7 @@ async def _build_video_v3(
     source: str,
     topic: str,
     images: list[str],
+    subtitle_path: str | None = None,
 ) -> bool:
     """Monta vídeo com cortes rápidos, zoom, transições e overlays."""
     style = TOPIC_STYLE.get(topic, TOPIC_STYLE["guerra"])
@@ -272,7 +289,8 @@ async def _build_video_v3(
     if images and len(images) >= 2:
         ok = await _build_with_images(
             video_path, voice_path, duration, safe_title, safe_summary,
-            safe_source, style, font, images, topic=topic
+            safe_source, style, font, images, topic=topic,
+            subtitle_path=subtitle_path,
         )
         if ok:
             return True
@@ -289,6 +307,7 @@ async def _build_with_images(
     title: str, summary: str, source: str,
     style: dict, font: str, images: list[str],
     topic: str = "guerra",
+    subtitle_path: str | None = None,
 ) -> bool:
     """Vídeo com slideshow de imagens — cortes rápidos + zoom + overlays."""
 
@@ -344,8 +363,12 @@ async def _build_with_images(
         f"drawtext=text='{source}':fontsize=18:fontcolor=#aaaaaa:x=50:y=1850:fontfile={font},"
         # Branding
         f"drawtext=text='NEXUS CLIPS':fontsize=14:fontcolor=#666666:x=900:y=1852:fontfile={font}"
-        f"[vout]"
     )
+    # Legendas word-by-word (se disponíveis)
+    if subtitle_path and Path(subtitle_path).exists():
+        sub_esc = subtitle_path.replace("'", "'\\''").replace(":", "\\:")
+        text_chain += f",subtitles='{sub_esc}'"
+    text_chain += "[vout]"
     filters.append(text_chain)
 
     # Music
