@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react'
 import { Eye, Heart, Film, Upload, TrendingUp, Clock, Flame, BarChart3 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
+import { getAccounts } from '../api/client'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
 import StatCard from './ui/StatCard'
 import Card, { CardHeader } from './ui/Card'
@@ -29,13 +31,11 @@ export default function Dashboard() {
     c: Math.floor(Math.random() * 10) + 1,
   }))
 
-  const channels = [
-    { name: 'Guerra Agora', topic: 'guerra', color: 'danger' },
-    { name: 'Gol a Gol', topic: 'futebol', color: 'success' },
-    { name: 'Brasil Livre News', topic: 'politica', color: 'info' },
-    { name: 'Povo Informa', topic: 'politica', color: 'warning' },
-    { name: 'Viralizou BR', topic: 'trending', color: 'accent' },
-  ]
+  const [accounts, setAccounts] = useState([])
+  useEffect(() => { getAccounts().then(d => setAccounts(d.accounts)).catch(() => {}) }, [])
+
+  const platformEmoji = { tiktok: '🎵', instagram: '📸', youtube: '▶️', twitter: '𝕏', telegram: '✈️' }
+  const platformColor = { tiktok: 'accent', instagram: 'danger', youtube: 'danger', twitter: 'info', telegram: 'info' }
 
   return (
     <div className="space-y-6">
@@ -70,13 +70,22 @@ export default function Dashboard() {
         </Card>
 
         <Card className="lg:col-span-2 animate-in" style={{ animationDelay: '280ms' }}>
-          <CardHeader title="Canais" subtitle="status" />
+          <CardHeader title="Canais" subtitle="contas conectadas" />
           <div className="space-y-1.5">
-            {channels.map(ch => (
-              <div key={ch.name} className="flex items-center gap-3 p-2 rounded-lg bg-surface-3/50 hover:bg-surface-3 transition-colors">
-                <Badge variant={ch.color} dot>{ch.topic}</Badge>
-                <span className="text-xs text-content-2 flex-1 truncate">{ch.name}</span>
-                <span className="text-[10px] font-mono text-success">ON</span>
+            {accounts.length === 0 && (
+              <p className="text-xs text-content-4 py-4 text-center">Nenhuma conta conectada</p>
+            )}
+            {accounts.map(acc => (
+              <div key={acc.id} className="flex items-center gap-3 p-2 rounded-lg bg-surface-3/50 hover:bg-surface-3 transition-colors">
+                <span className="text-sm">{platformEmoji[acc.platform] || '📱'}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs text-content-2 truncate block">{acc.name}</span>
+                  <span className="text-[9px] text-content-4">{acc.username}</span>
+                </div>
+                <div className="text-right">
+                  {acc.total_followers > 0 && <span className="text-[9px] font-mono text-content-3 block">{acc.total_followers.toLocaleString('pt-BR')} subs</span>}
+                  <Badge variant={acc.has_credentials ? 'success' : 'warning'} dot>{acc.active ? 'ON' : 'OFF'}</Badge>
+                </div>
               </div>
             ))}
           </div>
