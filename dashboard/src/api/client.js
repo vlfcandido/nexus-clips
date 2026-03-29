@@ -1,10 +1,10 @@
 const API_BASE = '/api'
 
 async function request(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options,
-  })
+  const headers = { ...options.headers }
+  if (options.body) headers['Content-Type'] = 'application/json'
+
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail || `HTTP ${res.status}`)
@@ -14,8 +14,9 @@ async function request(path, options = {}) {
 
 // Clips
 export const getClips = (params = {}) => {
-  const qs = new URLSearchParams(params).toString()
-  return request(`/clips?${qs}`)
+  const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v != null))
+  const qs = new URLSearchParams(clean).toString()
+  return request(`/clips${qs ? `?${qs}` : ''}`)
 }
 export const publishClip = (id) => request(`/clips/${id}/publish`, { method: 'POST' })
 export const deleteClip = (id) => request(`/clips/${id}`, { method: 'DELETE' })

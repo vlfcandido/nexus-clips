@@ -41,16 +41,17 @@ export function AppProvider({ children }) {
   const refresh = useCallback(async () => {
     dispatch({ type: 'SET_LOADING', payload: true })
     try {
-      const [clipsData, sourcesData, analyticsData, trendingData] = await Promise.all([
+      // Carrega cada endpoint independente (um falhando nao bloqueia os outros)
+      const [clipsData, sourcesData, analyticsData, trendingData] = await Promise.allSettled([
         getClips(state.filters),
         getSources(),
         getAnalytics(),
         getTrending(),
       ])
-      dispatch({ type: 'SET_CLIPS', payload: clipsData })
-      dispatch({ type: 'SET_SOURCES', payload: sourcesData.sources })
-      dispatch({ type: 'SET_ANALYTICS', payload: analyticsData })
-      dispatch({ type: 'SET_TRENDING', payload: trendingData.trends })
+      if (clipsData.status === 'fulfilled') dispatch({ type: 'SET_CLIPS', payload: clipsData.value })
+      if (sourcesData.status === 'fulfilled') dispatch({ type: 'SET_SOURCES', payload: sourcesData.value.sources })
+      if (analyticsData.status === 'fulfilled') dispatch({ type: 'SET_ANALYTICS', payload: analyticsData.value })
+      if (trendingData.status === 'fulfilled') dispatch({ type: 'SET_TRENDING', payload: trendingData.value.trends })
     } catch (err) {
       console.error('Refresh error:', err)
     }
