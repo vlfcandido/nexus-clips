@@ -4,7 +4,7 @@ import {
   Volume2, Wand2, FileText, Globe, MessageCircle, Layout, Star,
   ChevronDown, ChevronUp, Eye,
 } from 'lucide-react'
-import { generateClip, getTemplates } from '../api/client'
+import { generateClip, getTemplates, createTemplateFromNatural } from '../api/client'
 import { useApp } from '../context/AppContext'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
@@ -92,6 +92,205 @@ function Section({ icon: Icon, title, children, defaultOpen = true }) {
         {open ? <ChevronUp className="w-3.5 h-3.5 text-content-4" /> : <ChevronDown className="w-3.5 h-3.5 text-content-4" />}
       </button>
       {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  )
+}
+
+// ========== VIDEO PREVIEW — mockup visual do resultado ==========
+function VideoPreview({ brief, selectedMood, selectedVoice, selectedVisual, selectedSub, template }) {
+  const [adjustInput, setAdjustInput] = useState('')
+  const [adjusting, setAdjusting] = useState(false)
+  const [adjustResult, setAdjustResult] = useState(null)
+
+  const moodColor = selectedMood?.color || '#6366f1'
+  const topicText = brief.topic_query || brief.custom_text?.slice(0, 50) || 'Titulo da noticia aqui...'
+  const isNews = brief.visual_style === 'news'
+  const isCinematic = brief.visual_style === 'cinematic'
+  const isMinimal = brief.visual_style === 'minimal'
+
+  // Parse template elements
+  let templateElements = []
+  if (template?.layout_json) {
+    try { templateElements = JSON.parse(template.layout_json)?.elements || [] } catch {}
+  }
+
+  const hasBadge = templateElements.some(e => e.type === 'badge')
+  const hasProgressBar = templateElements.some(e => e.type === 'progress_bar')
+  const hasLetterbox = templateElements.some(e => e.type === 'letterbox')
+  const badgeEl = templateElements.find(e => e.type === 'badge')
+  const progressEl = templateElements.find(e => e.type === 'progress_bar')
+
+  async function handleAdjust() {
+    if (!adjustInput.trim()) return
+    setAdjusting(true)
+    try {
+      const r = await createTemplateFromNatural(adjustInput, template?.id || null)
+      setAdjustResult(r)
+      if (r.status === 'ok') setAdjustInput('')
+    } catch (e) { setAdjustResult({ status: 'error', error: e.message }) }
+    setAdjusting(false)
+  }
+
+  return (
+    <div className="bg-surface-2 border border-stroke-1 rounded-2xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Eye className="w-4 h-4 text-accent-light" />
+        <span className="text-xs font-semibold text-content-1">Preview do video</span>
+        <Badge variant="accent">ao vivo</Badge>
+      </div>
+
+      <div className="flex gap-4">
+        {/* Phone mockup */}
+        <div className="w-[180px] flex-shrink-0">
+          <div className="relative w-full aspect-[9/16] bg-surface-4 rounded-2xl overflow-hidden border-2 border-stroke-2 shadow-xl">
+            {/* Background image placeholder */}
+            <div className="absolute inset-0 bg-gradient-to-b from-surface-5/80 via-surface-4 to-surface-5/80">
+              <div className="absolute inset-0 opacity-30 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Crect%20width%3D%2260%22%20height%3D%2260%22%20fill%3D%22none%22/%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2230%22%20r%3D%221%22%20fill%3D%22%23333%22/%3E%3C/svg%3E')]" />
+            </div>
+
+            {/* Letterbox */}
+            {hasLetterbox && (
+              <>
+                <div className="absolute top-0 left-0 right-0 h-[8%] bg-black z-10" />
+                <div className="absolute bottom-0 left-0 right-0 h-[8%] bg-black z-10" />
+              </>
+            )}
+
+            {/* Top accent bar */}
+            {(isNews || hasBadge) && (
+              <div className="absolute top-0 left-0 right-0 h-[2px] z-20" style={{ backgroundColor: moodColor }} />
+            )}
+
+            {/* Top overlay */}
+            {!isMinimal && !isCinematic && (
+              <div className="absolute top-0 left-0 right-0 h-[28%] bg-gradient-to-b from-black/70 to-transparent z-10" />
+            )}
+
+            {/* Badge */}
+            {hasBadge && badgeEl && (
+              <div className="absolute top-[4%] left-[5%] z-20 px-1.5 py-0.5 rounded text-[5px] font-bold tracking-wider"
+                style={{ backgroundColor: badgeEl.color || moodColor, color: 'white' }}>
+                {badgeEl.text || 'URGENTE'}
+              </div>
+            )}
+
+            {/* Separator line under badge */}
+            {hasBadge && (
+              <div className="absolute top-[8%] left-[5%] w-[12%] h-[1px] z-20" style={{ backgroundColor: moodColor }} />
+            )}
+
+            {/* Title */}
+            <div className={`absolute z-20 left-[5%] right-[5%] ${
+              isCinematic ? 'bottom-[14%]' : isMinimal ? 'top-[45%]' : 'top-[10%]'
+            }`}>
+              <div className="h-[5px] bg-white/90 rounded-full w-[80%] mb-1" />
+              <div className="h-[5px] bg-white/60 rounded-full w-[55%]" />
+            </div>
+
+            {/* Summary (news style) */}
+            {isNews && (
+              <div className="absolute z-20 left-[5%] right-[5%] top-[42%]">
+                <div className="bg-black/50 rounded-lg p-2">
+                  <div className="h-[3px] bg-white/40 rounded-full w-full mb-1" />
+                  <div className="h-[3px] bg-white/30 rounded-full w-[85%] mb-1" />
+                  <div className="h-[3px] bg-white/25 rounded-full w-[65%]" />
+                </div>
+              </div>
+            )}
+
+            {/* Subtitle preview */}
+            {brief.subtitle_style !== 'none' && (
+              <div className="absolute z-20 left-[10%] right-[10%] bottom-[18%] text-center">
+                {brief.subtitle_style === 'word_by_word' && (
+                  <div className="flex justify-center gap-0.5">
+                    <span className="bg-white/90 text-black text-[5px] font-bold px-1 py-0.5 rounded">GUERRA</span>
+                    <span className="bg-white/40 text-white text-[5px] px-1 py-0.5 rounded">NO</span>
+                    <span className="bg-white/40 text-white text-[5px] px-1 py-0.5 rounded">ORIENTE</span>
+                  </div>
+                )}
+                {brief.subtitle_style === 'sentence' && (
+                  <div className="bg-black/60 rounded px-2 py-1">
+                    <div className="h-[3px] bg-white/70 rounded-full w-[90%] mx-auto" />
+                  </div>
+                )}
+                {brief.subtitle_style === 'highlight' && (
+                  <div className="flex justify-center gap-0.5">
+                    <span className="text-white text-[5px] px-0.5">Fuzileiros</span>
+                    <span className="text-[5px] px-0.5 font-bold" style={{ color: moodColor }}>3500</span>
+                    <span className="text-white text-[5px] px-0.5">chegam</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Bottom overlay */}
+            {!isMinimal && (
+              <div className="absolute bottom-0 left-0 right-0 h-[12%] bg-gradient-to-t from-black/80 to-transparent z-10" />
+            )}
+
+            {/* Source */}
+            <div className="absolute bottom-[4%] left-[5%] z-20">
+              <div className="h-[2px] bg-white/30 rounded-full w-[30%]" />
+            </div>
+
+            {/* Progress bar */}
+            {hasProgressBar && (
+              <div className="absolute bottom-0 left-0 right-0 h-[1.5px] z-30">
+                <div className="h-full w-[65%] rounded-r-full" style={{ backgroundColor: progressEl?.color || moodColor }} />
+              </div>
+            )}
+
+            {/* Phone notch */}
+            <div className="absolute top-1 left-1/2 -translate-x-1/2 w-[30%] h-1 bg-black rounded-full z-30" />
+          </div>
+
+          {/* Labels under preview */}
+          <div className="mt-2 text-center">
+            <p className="text-[9px] text-content-4">
+              {brief.duration}s · {brief.platform} · {selectedVisual?.label}
+            </p>
+          </div>
+        </div>
+
+        {/* Controls ao lado */}
+        <div className="flex-1 space-y-3">
+          <div>
+            <p className="text-[10px] text-content-3 mb-1">O que voce esta vendo:</p>
+            <ul className="text-[9px] text-content-4 space-y-1">
+              <li className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: moodColor }} />
+                Cor de acento: <strong className="text-content-2">{selectedMood?.label}</strong> ({moodColor})
+              </li>
+              {hasBadge && <li>✓ Badge "{badgeEl?.text}" no topo</li>}
+              {hasProgressBar && <li>✓ Barra de progresso no bottom</li>}
+              {hasLetterbox && <li>✓ Letterbox (barras pretas)</li>}
+              <li>✓ Estilo: {selectedVisual?.label}</li>
+              <li>✓ Legenda: {selectedSub?.label}</li>
+              <li>✓ Voz: {selectedVoice?.label}</li>
+            </ul>
+          </div>
+
+          {/* Ajuste por linguagem natural */}
+          <div className="pt-2 border-t border-stroke-1">
+            <p className="text-[10px] font-semibold text-content-3 mb-1.5 flex items-center gap-1">
+              <Wand2 className="w-3 h-3 text-accent-light" /> Ajustar layout
+            </p>
+            <div className="flex gap-1.5">
+              <input value={adjustInput} onChange={e => setAdjustInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAdjust()}
+                placeholder="Ex: diminui o rodape, aumenta a opacidade do topo..."
+                className="flex-1 bg-surface-3 border border-stroke-2 rounded-lg px-2.5 py-1.5 text-[10px] text-content-1 placeholder-content-4 outline-none focus:border-accent/50" />
+              <button onClick={handleAdjust}
+                className={`px-2.5 py-1.5 bg-accent-muted text-accent-light rounded-lg text-[10px] font-medium hover:bg-accent/20 transition-colors ${adjusting ? 'opacity-50' : ''}`}>
+                {adjusting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Ajustar'}
+              </button>
+            </div>
+            {adjustResult?.status === 'ok' && (
+              <p className="text-[9px] text-success mt-1">✅ Template ajustado! Recarregue a pagina pra ver.</p>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -371,6 +570,16 @@ export default function StudioView() {
           placeholder="Ex: foca em imagens de soldados, usa tom mais serio, coloca barra de noticias no bottom..."
           className="w-full bg-surface-3 border border-stroke-2 rounded-lg px-3 py-2 text-xs text-content-1 placeholder-content-4 outline-none focus:border-accent/50 resize-y" />
       </Section>
+
+      {/* ===== PREVIEW VISUAL DO VIDEO ===== */}
+      <VideoPreview
+        brief={brief}
+        selectedMood={selectedMood}
+        selectedVoice={selectedVoice}
+        selectedVisual={selectedVisual}
+        selectedSub={selectedSub}
+        template={templates.find(t => t.id === brief.template_id)}
+      />
 
       {/* ===== RESUMO + GERAR ===== */}
       <Card glow>
