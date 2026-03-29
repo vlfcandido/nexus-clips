@@ -153,18 +153,66 @@ export default function AccountsView() {
             </div>
           </div>
 
+          {/* Guia de conexão por plataforma */}
+          <div className="mb-4 p-3 bg-accent-muted/50 border border-accent/10 rounded-lg">
+            <p className="text-[11px] font-semibold text-accent-light mb-2">Como conectar {form.platform}:</p>
+            {form.platform === 'telegram' && (
+              <ol className="text-[10px] text-content-3 space-y-1 list-decimal ml-4">
+                <li>Abra o Telegram e busque <strong>@BotFather</strong></li>
+                <li>Envie <code className="bg-surface-4 px-1 rounded">/newbot</code> e siga as instrucoes</li>
+                <li>Copie o <strong>token do bot</strong> que ele gerar</li>
+                <li>Cole no campo <strong>Access Token</strong> abaixo</li>
+                <li>Crie um canal/grupo e adicione o bot como admin</li>
+              </ol>
+            )}
+            {form.platform === 'tiktok' && (
+              <ol className="text-[10px] text-content-3 space-y-1 list-decimal ml-4">
+                <li>Acesse <strong>developers.tiktok.com</strong></li>
+                <li>Crie um app e solicite <strong>Content Posting API</strong></li>
+                <li>Copie <strong>Client Key</strong> → cole em API Key</li>
+                <li>Copie <strong>Client Secret</strong> → cole em Access Token</li>
+                <li>Aguarde aprovacao do TikTok (pode levar dias)</li>
+              </ol>
+            )}
+            {form.platform === 'instagram' && (
+              <ol className="text-[10px] text-content-3 space-y-1 list-decimal ml-4">
+                <li>Acesse <strong>developers.facebook.com</strong></li>
+                <li>Crie app → adicione <strong>Instagram Graph API</strong></li>
+                <li>Conecte sua conta Instagram Business</li>
+                <li>Gere um <strong>Page Access Token</strong> (longo prazo)</li>
+                <li>Cole no campo <strong>Access Token</strong> abaixo</li>
+              </ol>
+            )}
+            {form.platform === 'youtube' && (
+              <ol className="text-[10px] text-content-3 space-y-1 list-decimal ml-4">
+                <li>Acesse <strong>console.cloud.google.com</strong></li>
+                <li>Crie projeto → ative <strong>YouTube Data API v3</strong></li>
+                <li>Crie credenciais <strong>OAuth 2.0</strong></li>
+                <li>Cole API Key e Access Token nos campos abaixo</li>
+              </ol>
+            )}
+            {form.platform === 'twitter' && (
+              <ol className="text-[10px] text-content-3 space-y-1 list-decimal ml-4">
+                <li>Acesse <strong>developer.twitter.com</strong></li>
+                <li>Crie um app (Free tier funciona)</li>
+                <li>Gere <strong>Bearer Token</strong></li>
+                <li>Cole no campo <strong>Access Token</strong> abaixo</li>
+              </ol>
+            )}
+          </div>
+
           {/* Credenciais */}
-          <details className="mb-4">
-            <summary className="text-[11px] font-medium text-content-3 cursor-pointer hover:text-content-2 flex items-center gap-1">
-              <Shield className="w-3 h-3" /> Credenciais (API keys)
-            </summary>
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <Input label="API Key" placeholder="Opcional" type="password" value={form.api_key}
+          <div className="mb-4">
+            <p className="text-[11px] font-medium text-content-3 mb-2 flex items-center gap-1">
+              <Shield className="w-3 h-3" /> Credenciais
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="API Key" placeholder="Client Key / API Key" type="password" value={form.api_key}
                 onChange={e => setForm({ ...form, api_key: e.target.value })} />
-              <Input label="Access Token" placeholder="Opcional" type="password" value={form.access_token}
+              <Input label="Access Token" placeholder="Token / Secret" type="password" value={form.access_token}
                 onChange={e => setForm({ ...form, access_token: e.target.value })} />
             </div>
-          </details>
+          </div>
 
           {/* Auto publish */}
           <div className="mb-4">
