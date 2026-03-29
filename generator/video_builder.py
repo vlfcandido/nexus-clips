@@ -71,7 +71,13 @@ async def generate_narrated_video(
     log.info("video_builder.tts", chars=len(clean_text), voice=voice)
 
     if not await _edge_tts(clean_text, voice_path, voice, voice_rate):
-        if not await _gtts_fallback(clean_text, voice_path):
+        # Fallback: tenta com AntonioNeural (sempre funciona)
+        if voice != "pt-BR-AntonioNeural":
+            log.info("video_builder.tts_fallback_voice", from_voice=voice)
+            if not await _edge_tts(clean_text, voice_path, "pt-BR-AntonioNeural", voice_rate):
+                if not await _gtts_fallback(clean_text, voice_path):
+                    return None
+        elif not await _gtts_fallback(clean_text, voice_path):
             return None
 
     # === 2. Duração ===
@@ -114,41 +120,51 @@ async def generate_narrated_video(
 # ==================== TTS ====================
 
 async def _edge_tts(text: str, out: str, voice: str, rate: str) -> bool:
-    """Edge TTS via subprocess — arquivo temp pra texto e script."""
+    """Edge TTS — usa subprocess com script em arquivo (mais confiável)."""
     try:
         import tempfile
 
-        # Arquivo com o texto
-        txt_file = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
-        txt_file.write(text)
-        txt_file.close()
+        # Escreve texto e script em arquivos temp
+        txt_path = tempfile.mktemp(suffix='.txt')
+        script_path = tempfile.mktemp(suffix='.py')
 
-        # Script Python separado
-        script_file = tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8')
-        script_file.write(
-            "import asyncio, edge_tts, pathlib\n"
-            "async def g():\n"
-            f"    t = pathlib.Path(r'{txt_file.name}').read_text(encoding='utf-8')\n"
-            f"    c = edge_tts.Communicate(t, '{voice}', rate='{rate}')\n"
+        Path(txt_path).write_text(text, encoding='utf-8')
+        Path(script_path).write_text(
+            f"import asyncio, edge_tts\n"
+            f"async def main():\n"
+            f"    text = open(r'{txt_path}', encoding='utf-8').read()\n"
+            f"    c = edge_tts.Communicate(text, r'{voice}', rate=r'{rate}')\n"
             f"    await c.save(r'{out}')\n"
-            "asyncio.run(g())\n"
+            f"asyncio.run(main())\n",
+            encoding='utf-8',
         )
-        script_file.close()
+
+        # Usa path absoluto do Python do venv (uvicorn reload muda sys.executable)
+        python_path = str(Path(__file__).parent.parent / ".venv" / "bin" / "python")
+        if not Path(python_path).exists():
+            python_path = sys.executable
 
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, script_file.name,
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            python_path, script_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
         _, stderr = await proc.communicate()
 
-        Path(txt_file.name).unlink(missing_ok=True)
-        Path(script_file.name).unlink(missing_ok=True)
+        # Cleanup
+        Path(txt_path).unlink(missing_ok=True)
+        Path(script_path).unlink(missing_ok=True)
 
-        if proc.returncode != 0 or not Path(out).exists() or Path(out).stat().st_size < 100:
-            log.error("tts.edge_fail", err=stderr.decode()[:200])
+        if proc.returncode != 0:
+            err = stderr.decode()[-200:]
+            log.error("tts.edge_fail", err=err)
             return False
 
-        log.info("tts.edge_ok", size=Path(out).stat().st_size)
+        if not Path(out).exists() or Path(out).stat().st_size < 100:
+            log.error("tts.edge_empty")
+            return False
+
+        log.info("tts.edge_ok", voice=voice, size=Path(out).stat().st_size)
         return True
     except Exception as e:
         log.error("tts.edge_error", error=str(e))

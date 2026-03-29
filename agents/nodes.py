@@ -339,14 +339,18 @@ async def generate_video_node(state: ContentState) -> dict:
     narration = re.sub(r'[^\w\s.,!?;:\-\'\"áàâãéèêíìîóòôõúùûçÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ]', '', narration).strip()
     log.info("node.generate_video.narration", uid=uid, text=narration[:100])
 
-    # Escolhe voz pelo estilo
+    # Escolhe voz (vozes testadas e funcionais no Edge TTS)
     voice_map = {
         "narrador": "pt-BR-AntonioNeural",
-        "informal": "pt-BR-MacerioNeural",
-        "urgente": "pt-BR-HumbertoNeural",
+        "informal": "pt-BR-AntonioNeural",
+        "urgente": "pt-BR-AntonioNeural",
         "humoristico": "pt-BR-ThalitaNeural",
+        # Vozes diretas (do Studio)
+        "pt-BR-AntonioNeural": "pt-BR-AntonioNeural",
+        "pt-BR-FranciscaNeural": "pt-BR-FranciscaNeural",
+        "pt-BR-ThalitaNeural": "pt-BR-ThalitaNeural",
     }
-    voice = voice_map.get(state.get("voice_style", "narrador"), "pt-BR-AntonioNeural")
+    voice = voice_map.get(state.get("voice_style", ""), "pt-BR-AntonioNeural")
 
     result = await generate_narrated_video(
         title=state.get("suggested_title", state.get("summary", "")[:60]),
