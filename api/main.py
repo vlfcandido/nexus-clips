@@ -8,6 +8,7 @@ import structlog
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import desc, func, select, update
 
@@ -33,6 +34,10 @@ app.add_middleware(
 )
 
 pipeline = Pipeline()
+
+# Serve arquivos de mídia (vídeos, thumbnails, áudio)
+settings.clips_output_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(settings.clips_output_dir)), name="media")
 
 
 # ==================== LIFECYCLE ====================

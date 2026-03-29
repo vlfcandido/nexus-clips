@@ -51,6 +51,7 @@ from agents.nodes import (
     caption_node,
     channels_node,
     classify_node,
+    generate_video_node,
     growth_node,
     save_node,
     strategize_node,
@@ -106,35 +107,47 @@ def build_graph() -> StateGraph:
     graph.add_node("caption", caption_node)
     graph.add_node("growth", growth_node)
     graph.add_node("channels", channels_node)
+    graph.add_node("generate_video", generate_video_node)
     graph.add_node("save", save_node)
 
     # 3. Define o fluxo
+    #
+    # GRAFO ATUALIZADO:
+    #
+    #   START → classify → [relevante?]
+    #                          |
+    #                    strategize
+    #                     /   |   \
+    #               caption growth channels  (paralelo: IA)
+    #                     \   |   /
+    #                  generate_video         (gera vídeo com voz + ffmpeg)
+    #                        |
+    #                      save → END
+    #
 
-    # START → classify
     graph.add_edge(START, "classify")
 
-    # classify → decisão condicional
     graph.add_conditional_edges(
         "classify",
         should_process,
         {
-            "process": "strategize",  # Se relevante → próximo nó
-            "skip": END,              # Se não relevante → fim
+            "process": "strategize",
+            "skip": END,
         },
     )
 
-    # strategize → 3 nós paralelos (caption, growth, channels)
-    # CONCEITO LANGGRAPH: múltiplas edges do mesmo nó = execução paralela
+    # strategize → 3 nós paralelos (IA — rápido)
     graph.add_edge("strategize", "caption")
     graph.add_edge("strategize", "growth")
     graph.add_edge("strategize", "channels")
 
-    # Os 3 nós paralelos → save
-    graph.add_edge("caption", "save")
-    graph.add_edge("growth", "save")
-    graph.add_edge("channels", "save")
+    # 3 nós paralelos → generate_video (precisa do hook do growth pra narração)
+    graph.add_edge("caption", "generate_video")
+    graph.add_edge("growth", "generate_video")
+    graph.add_edge("channels", "generate_video")
 
-    # save → END
+    # generate_video → save → END
+    graph.add_edge("generate_video", "save")
     graph.add_edge("save", END)
 
     return graph

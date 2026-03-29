@@ -338,6 +338,66 @@ async def channels_node(state: ContentState) -> dict:
     }
 
 
+# ==================== NÓ: GENERATE VIDEO ====================
+
+async def generate_video_node(state: ContentState) -> dict:
+    """Nó que gera o vídeo (voz + ffmpeg).
+
+    CONCEITO LANGGRAPH:
+    - Este nó faz trabalho pesado (I/O, ffmpeg) mas é async
+    - O state acumula os paths dos arquivos gerados
+    """
+    uid = state.get("uid", "")
+    log.info("node.generate_video.start", uid=uid, format=state.get("format_type"))
+
+    from generator.video_builder import generate_narrated_video
+
+    # Monta texto de narração combinando hook + summary
+    hook = state.get("hook_text", "")
+    summary = state.get("summary", "")
+    narration = f"{hook}. {summary}" if hook else summary
+    # Remove emojis e caracteres non-latin que Edge TTS não processa
+    import re
+    narration = re.sub(r'[^\w\s.,!?;:\-\'\"áàâãéèêíìîóòôõúùûçÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ]', '', narration).strip()
+    log.info("node.generate_video.narration", uid=uid, text=narration[:100])
+
+    # Escolhe voz pelo estilo
+    voice_map = {
+        "narrador": "pt-BR-AntonioNeural",
+        "informal": "pt-BR-MacerioNeural",
+        "urgente": "pt-BR-HumbertoNeural",
+        "humoristico": "pt-BR-ThalitaNeural",
+    }
+    voice = voice_map.get(state.get("voice_style", "narrador"), "pt-BR-AntonioNeural")
+
+    result = await generate_narrated_video(
+        title=state.get("suggested_title", state.get("summary", "")[:60]),
+        summary=state.get("summary", ""),
+        narration_text=narration,
+        source=state.get("source_author", state.get("source_type", "")),
+        category=state.get("category", "breaking"),
+        topic=state.get("topic", "guerra"),
+        output_name=uid,
+        voice=voice,
+    )
+
+    if result:
+        log.info(
+            "node.generate_video.done",
+            uid=uid,
+            video=result["video_path"],
+            duration=round(result["duration"], 1),
+        )
+        return {
+            "clip_path": result["video_path"],
+            "voice_path": result["voice_path"],
+            "duration_target": int(result["duration"]),
+        }
+
+    log.warning("node.generate_video.failed", uid=uid)
+    return {}
+
+
 # ==================== NÓ: SAVE ====================
 
 async def save_node(state: ContentState) -> dict:
@@ -352,6 +412,19 @@ async def save_node(state: ContentState) -> dict:
         state.get("primary_platform", "tiktok"), {}
     )
 
+    # Converte paths absolutos pra URLs relativas (/media/...)
+    clip_path = state.get("clip_path", "")
+    if clip_path:
+        from pathlib import Path
+        rel = Path(clip_path).relative_to(settings.clips_output_dir)
+        clip_path = f"/media/{rel}"
+
+    thumb_path = state.get("thumbnail_path", "")
+    if thumb_path:
+        from pathlib import Path
+        rel = Path(thumb_path).relative_to(settings.clips_output_dir)
+        thumb_path = f"/media/{rel}"
+
     async with async_session() as session:
         clip = Clip(
             source_type=state.get("source_type", ""),
@@ -361,8 +434,8 @@ async def save_node(state: ContentState) -> dict:
             category=state.get("category", ""),
             moment_text=state.get("summary", ""),
             confidence=state.get("classification_confidence", 0),
-            clip_path=state.get("clip_path", ""),
-            thumbnail_path=state.get("thumbnail_path", ""),
+            clip_path=clip_path,
+            thumbnail_path=thumb_path,
             duration_seconds=state.get("duration_target", 60),
             caption=primary_caption.get("caption", state.get("summary", "")),
             hashtags=" ".join(primary_caption.get("hashtags", [])),
