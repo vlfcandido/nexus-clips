@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Sparkles, Loader2, Play, Image, Type, Music, Clock, Palette,
   Volume2, AlignLeft, Hash, Zap, Eye, RotateCcw, ChevronDown, ChevronUp,
-  Wand2, FileText, Globe, MessageCircle, Tv, BarChart3,
+  Wand2, FileText, Globe, MessageCircle, Tv, BarChart3, Layout, Star,
 } from 'lucide-react'
-import { generateClip } from '../api/client'
+import { generateClip, getTemplates } from '../api/client'
 import { useApp } from '../context/AppContext'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
@@ -96,6 +96,9 @@ export default function StudioView() {
   const [generating, setGenerating] = useState(false)
   const [result, setResult] = useState(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [templates, setTemplates] = useState([])
+
+  useEffect(() => { getTemplates().then(d => setTemplates(d.templates)).catch(() => {}) }, [])
 
   const [brief, setBrief] = useState({
     // Conteudo
@@ -118,6 +121,9 @@ export default function StudioView() {
     // Formato
     duration: 30,
     platform: 'tiktok',
+
+    // Template visual
+    template_id: null,
 
     // Instrucoes extras (prompt livre)
     extra_instructions: '',
@@ -224,6 +230,25 @@ export default function StudioView() {
               <span className="text-lg block mb-1">{v.icon}</span>
               <span className="text-[11px] font-semibold text-content-1 block">{v.label}</span>
               <span className="text-[9px] text-content-4">{v.desc}</span>
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      {/* Template visual */}
+      <Section icon={Layout} title="Template Visual">
+        <p className="text-[10px] text-content-4 mb-2">Escolha o layout do video (barras, titulos, posicoes). Edite em Templates.</p>
+        <div className="grid grid-cols-4 gap-2">
+          {templates.map(t => (
+            <button key={t.id} onClick={() => set('template_id', t.id)}
+              className={`p-2.5 rounded-xl border text-center transition-all ${
+                brief.template_id === t.id
+                  ? 'border-accent/40 bg-accent-muted ring-1 ring-accent/20'
+                  : 'border-stroke-1 bg-surface-3/30 hover:border-stroke-2'
+              }`}>
+              <span className="text-xs font-semibold text-content-1 block">{t.name}</span>
+              <span className="text-[9px] text-content-4">{t.category}</span>
+              {t.is_default && <Star className="w-2.5 h-2.5 text-warning inline ml-1" />}
             </button>
           ))}
         </div>

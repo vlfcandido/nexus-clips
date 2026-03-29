@@ -331,7 +331,9 @@ export default function ClipsView() {
                     <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{clip.duration_seconds}s</span>
                     {clip.views > 0 && <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{clip.views.toLocaleString('pt-BR')}</span>}
                   </div>
-                  <span className="text-[10px]">{new Date(clip.created_at).toLocaleDateString('pt-BR')}</span>
+                  <span className="text-[10px] font-mono">
+                    {new Date(clip.created_at).toLocaleDateString('pt-BR')} {new Date(clip.created_at).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
+                  </span>
                 </div>
               </div>
               <div className="flex border-t border-stroke-1 opacity-0 group-hover:opacity-100 transition-opacity">

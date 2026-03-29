@@ -65,7 +65,7 @@ export function VideoThumbnail({ src, videoSrc, duration, onClick, className = '
       {src ? (
         <img src={src} className="w-full h-full object-cover" alt="" />
       ) : videoSrc ? (
-        <video src={videoSrc} className="w-full h-full object-cover" muted preload="metadata" />
+        <video src={`${videoSrc}#t=0.5`} className="w-full h-full object-cover" muted preload="metadata" playsInline />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
           <Play className="w-5 h-5 text-content-4" />
