@@ -2,112 +2,75 @@ import { TrendingUp, Flame, Plus, RefreshCw } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { addSource } from '../api/client'
 
-const CATEGORY_COLORS = {
-  futebol: 'bg-green-500/20 text-green-400 border-green-500/30',
-  política: 'bg-red-500/20 text-red-400 border-red-500/30',
-  outro: 'bg-gray-700/20 text-gray-400 border-gray-700/30',
-}
-
 export default function TrendingView() {
   const { state, refresh } = useApp()
 
   async function handleMonitor(trend) {
-    try {
-      await addSource({
-        source_type: 'twitter',
-        identifier: trend.name,
-        topic: trend.category === 'outro' ? 'entretenimento' : trend.category,
-      })
-      refresh()
-    } catch {}
+    await addSource({
+      source_type: 'twitter',
+      identifier: trend.name,
+      topic: trend.category === 'outro' ? 'entretenimento' : trend.category,
+    })
+    refresh()
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between anim-fade">
         <div>
-          <h2 className="text-2xl font-bold text-white">Trending</h2>
-          <p className="text-gray-500 text-sm mt-1">Topicos em alta no Brasil agora</p>
+          <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">Trending</h1>
+          <p className="text-sm text-zinc-500 mt-1">Topicos em alta no Brasil agora</p>
         </div>
-        <button
-          onClick={refresh}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-gray-400 rounded-lg text-sm hover:text-white transition-all"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Atualizar
+        <button onClick={refresh}
+          className="flex items-center gap-2 px-3 py-2 bg-zinc-800/60 text-zinc-400 rounded-lg text-xs hover:text-white transition-colors">
+          <RefreshCw className="w-3.5 h-3.5" /> Atualizar
         </button>
       </div>
 
-      {/* Grid de trends */}
-      <div className="space-y-2">
-        {(state.trending || []).map((trend, i) => (
-          <div
-            key={i}
-            className={`bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center justify-between hover:border-gray-700 transition-all`}
+      <div className="space-y-1.5 stagger">
+        {(state.trending || []).map((t, i) => (
+          <div key={i}
+            className="anim-fade-up flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/60 hover:border-zinc-700/60 transition-all group"
           >
-            <div className="flex items-center gap-4">
-              {/* Rank */}
-              <span className={`text-lg font-bold w-8 text-center ${
-                i < 3 ? 'text-nexus-400' : 'text-gray-600'
-              }`}>
-                {i + 1}
-              </span>
+            <span className={`text-sm font-bold font-mono w-6 text-center ${i < 3 ? 'text-violet-400' : 'text-zinc-700'}`}>
+              {String(i + 1).padStart(2, '0')}
+            </span>
 
-              {/* Info */}
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-white font-medium">{trend.name}</p>
-                  {trend.should_monitor && (
-                    <Flame className="w-4 h-4 text-orange-400" />
-                  )}
-                </div>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium border ${
-                    CATEGORY_COLORS[trend.category] || CATEGORY_COLORS.outro
-                  }`}>
-                    {trend.category}
-                  </span>
-                  <span className="text-xs text-gray-500">{trend.source}</span>
-                  {trend.volume > 0 && (
-                    <span className="text-xs text-gray-500">
-                      {trend.volume.toLocaleString('pt-BR')} menções
-                    </span>
-                  )}
-                </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-zinc-200">{t.name}</span>
+                {t.should_monitor && <Flame className="w-3.5 h-3.5 text-amber-400" />}
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                  t.category === 'guerra' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                  t.category === 'futebol' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                  t.category === 'política' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' :
+                  'bg-zinc-800 text-zinc-500 border-zinc-700'
+                }`}>{t.category}</span>
+                <span className="text-[10px] text-zinc-600">{t.source}</span>
+                {t.volume > 0 && <span className="text-[10px] text-zinc-600">{t.volume.toLocaleString('pt-BR')} mencoes</span>}
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* Viralidade */}
-              <div className="text-right">
-                <div className="flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3 text-gray-500" />
-                  <span className={`text-sm font-bold ${
-                    trend.virality >= 7 ? 'text-green-400' :
-                    trend.virality >= 4 ? 'text-yellow-400' : 'text-gray-500'
-                  }`}>
-                    {trend.virality.toFixed(1)}
-                  </span>
-                </div>
-                <span className="text-xs text-gray-600">viralidade</span>
-              </div>
-
-              {/* Monitorar */}
-              <button
-                onClick={() => handleMonitor(trend)}
-                className="p-2 rounded-lg bg-nexus-600/20 text-nexus-400 hover:bg-nexus-600/30 transition-all"
-                title="Adicionar como fonte"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
+            <div className="text-right mr-2">
+              <span className={`text-sm font-bold font-mono ${
+                t.virality >= 7 ? 'text-emerald-400' : t.virality >= 4 ? 'text-amber-400' : 'text-zinc-600'
+              }`}>{t.virality.toFixed(1)}</span>
+              <p className="text-[9px] text-zinc-600">viral</p>
             </div>
+
+            <button onClick={() => handleMonitor(t)}
+              className="p-2 rounded-lg text-zinc-600 hover:text-violet-400 hover:bg-violet-500/10 transition-colors opacity-0 group-hover:opacity-100">
+              <Plus className="w-4 h-4" />
+            </button>
           </div>
         ))}
 
-        {(!state.trending || state.trending.length === 0) && (
-          <div className="text-center py-16 text-gray-600">
-            <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>Carregando trending topics...</p>
+        {(!state.trending || !state.trending.length) && (
+          <div className="text-center py-20 anim-fade">
+            <TrendingUp className="w-10 h-10 text-zinc-800 mx-auto mb-3" />
+            <p className="text-sm text-zinc-600">Carregando trending topics...</p>
           </div>
         )}
       </div>

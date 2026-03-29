@@ -1,171 +1,131 @@
 import { useState } from 'react'
-import { Film, Play, Upload, Trash2, ExternalLink, Eye, Clock, Tag } from 'lucide-react'
+import { Film, Upload, Trash2, ExternalLink, Eye, Clock, Play, MoreHorizontal } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { publishClip, deleteClip } from '../api/client'
 
-const TOPIC_COLORS = {
-  futebol: 'bg-green-500/20 text-green-400',
-  política: 'bg-red-500/20 text-red-400',
-  entretenimento: 'bg-blue-500/20 text-blue-400',
+const TOPIC_STYLES = {
+  guerra: 'bg-red-500/10 text-red-400 border-red-500/20',
+  futebol: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  política: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+  entretenimento: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20',
 }
 
-const CATEGORY_ICONS = {
-  gol: '⚽',
-  polêmica: '🔥',
-  declaração: '🎙️',
-  treta: '💥',
-  breaking: '🚨',
-  humor: '😂',
-  análise: '📊',
+const CATEGORY_EMOJI = {
+  gol: '⚽', polêmica: '🔥', declaração: '🎙️', treta: '💥',
+  breaking: '🚨', humor: '😂', análise: '📊',
 }
 
 export default function ClipsView() {
   const { state, dispatch, refresh } = useApp()
-  const [filter, setFilter] = useState('all') // all, published, pending
+  const [filter, setFilter] = useState('all')
 
-  const filteredClips = state.clips.filter((c) => {
+  const clips = state.clips.filter((c) => {
     if (filter === 'published') return c.published
     if (filter === 'pending') return !c.published
     return true
   })
 
   async function handlePublish(id) {
-    try {
-      await publishClip(id)
-      refresh()
-    } catch (err) {
-      alert(`Erro: ${err.message}`)
-    }
+    try { await publishClip(id); refresh() }
+    catch (e) { alert(e.message) }
   }
 
   async function handleDelete(id) {
-    if (!confirm('Deletar este clip?')) return
-    try {
-      await deleteClip(id)
-      refresh()
-    } catch (err) {
-      alert(`Erro: ${err.message}`)
-    }
+    if (!confirm('Deletar este conteudo?')) return
+    try { await deleteClip(id); refresh() }
+    catch (e) { alert(e.message) }
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-end justify-between anim-fade">
         <div>
-          <h2 className="text-2xl font-bold text-white">Conteudos</h2>
-          <p className="text-gray-500 text-sm mt-1">{state.clipsTotal} clips no total</p>
+          <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">Conteudos</h1>
+          <p className="text-sm text-zinc-500 mt-1">{state.clipsTotal} conteudos gerados</p>
         </div>
-
-        {/* Filtros */}
-        <div className="flex gap-2">
-          {['all', 'pending', 'published'].map((f) => (
+        <div className="flex bg-zinc-800/60 rounded-lg p-0.5">
+          {[
+            { key: 'all', label: 'Todos' },
+            { key: 'pending', label: 'Pendentes' },
+            { key: 'published', label: 'Publicados' },
+          ].map(({ key, label }) => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                filter === f
-                  ? 'bg-nexus-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-white'
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                filter === key ? 'bg-zinc-700 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
-              {f === 'all' ? 'Todos' : f === 'pending' ? 'Pendentes' : 'Publicados'}
+              {label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Lista de clips */}
-      <div className="space-y-3">
-        {filteredClips.length === 0 && (
-          <div className="text-center py-20 text-gray-600">
-            <Film className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>Nenhum clip ainda. O pipeline esta monitorando fontes...</p>
+      {/* List */}
+      <div className="space-y-2 stagger">
+        {clips.length === 0 && (
+          <div className="text-center py-24 anim-fade">
+            <Film className="w-10 h-10 text-zinc-800 mx-auto mb-3" />
+            <p className="text-sm text-zinc-600">Nenhum conteudo ainda</p>
+            <p className="text-xs text-zinc-700 mt-1">O pipeline esta monitorando fontes...</p>
           </div>
         )}
 
-        {filteredClips.map((clip) => (
+        {clips.map((clip) => (
           <div
             key={clip.id}
-            className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-gray-700 transition-all"
+            className="anim-fade-up group bg-zinc-900/50 border border-zinc-800/60 rounded-xl p-4 hover:border-zinc-700/60 transition-all"
           >
-            <div className="flex items-start justify-between gap-4">
-              {/* Info */}
+            <div className="flex items-start gap-4">
+              {/* Thumbnail placeholder */}
+              <div className="w-20 h-14 rounded-lg bg-zinc-800 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                {clip.thumbnail_path ? (
+                  <img src={clip.thumbnail_path} className="w-full h-full object-cover" />
+                ) : (
+                  <Play className="w-5 h-5 text-zinc-700" />
+                )}
+              </div>
+
+              {/* Content */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">{CATEGORY_ICONS[clip.category] || '📎'}</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${TOPIC_COLORS[clip.topic] || 'bg-gray-800 text-gray-400'}`}>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-sm">{CATEGORY_EMOJI[clip.category] || '📎'}</span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${TOPIC_STYLES[clip.topic] || 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
                     {clip.topic}
                   </span>
-                  <span className="text-xs text-gray-600">{clip.category}</span>
+                  <span className="text-[10px] text-zinc-600">{clip.category}</span>
                   {clip.published && (
-                    <span className="px-2 py-0.5 rounded bg-green-500/20 text-green-400 text-xs">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       Publicado
                     </span>
                   )}
                 </div>
 
-                <p className="text-white font-medium truncate">{clip.caption || clip.moment_text}</p>
+                <p className="text-sm text-zinc-200 font-medium truncate">{clip.caption || clip.moment_text}</p>
 
-                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {clip.duration_seconds}s
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Tag className="w-3 h-3" />
-                    {clip.source_type}
-                  </span>
-                  {clip.views > 0 && (
-                    <span className="flex items-center gap-1">
-                      <Eye className="w-3 h-3" />
-                      {clip.views.toLocaleString('pt-BR')}
-                    </span>
-                  )}
+                <div className="flex items-center gap-3 mt-1.5 text-[11px] text-zinc-600">
+                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{clip.duration_seconds}s</span>
+                  <span>{clip.source_type}</span>
+                  {clip.views > 0 && <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{clip.views.toLocaleString('pt-BR')}</span>}
                   <span>{new Date(clip.created_at).toLocaleDateString('pt-BR')}</span>
                 </div>
-
-                {/* URLs de publicação */}
-                {clip.published && (
-                  <div className="flex gap-2 mt-2">
-                    {clip.tiktok_url && (
-                      <a href={clip.tiktok_url} target="_blank" className="text-xs text-nexus-400 hover:underline">TikTok</a>
-                    )}
-                    {clip.instagram_url && (
-                      <a href={clip.instagram_url} target="_blank" className="text-xs text-pink-400 hover:underline">Instagram</a>
-                    )}
-                    {clip.twitter_url && (
-                      <a href={clip.twitter_url} target="_blank" className="text-xs text-blue-400 hover:underline">Twitter</a>
-                    )}
-                  </div>
-                )}
               </div>
 
-              {/* Ações */}
-              <div className="flex items-center gap-2 shrink-0">
+              {/* Actions */}
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 {!clip.published && (
-                  <button
-                    onClick={() => handlePublish(clip.id)}
-                    className="p-2 rounded-lg bg-nexus-600/20 text-nexus-400 hover:bg-nexus-600/30 transition-all"
-                    title="Publicar"
-                  >
+                  <button onClick={() => handlePublish(clip.id)} className="p-2 rounded-lg text-zinc-500 hover:text-violet-400 hover:bg-violet-500/10 transition-colors" title="Publicar">
                     <Upload className="w-4 h-4" />
                   </button>
                 )}
                 {clip.source_url && (
-                  <a
-                    href={clip.source_url}
-                    target="_blank"
-                    className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white transition-all"
-                    title="Ver fonte"
-                  >
+                  <a href={clip.source_url} target="_blank" className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors" title="Fonte">
                     <ExternalLink className="w-4 h-4" />
                   </a>
                 )}
-                <button
-                  onClick={() => handleDelete(clip.id)}
-                  className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-red-400 transition-all"
-                  title="Deletar"
-                >
+                <button onClick={() => handleDelete(clip.id)} className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Deletar">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -174,23 +134,22 @@ export default function ClipsView() {
         ))}
       </div>
 
-      {/* Paginação */}
+      {/* Pagination */}
       {state.clipsTotal > 20 && (
-        <div className="flex justify-center gap-2">
+        <div className="flex justify-center gap-2 pt-2">
           <button
             onClick={() => dispatch({ type: 'SET_FILTERS', payload: { page: Math.max(1, state.filters.page - 1) } })}
-            className="px-4 py-2 bg-gray-800 rounded-lg text-sm text-gray-400 hover:text-white"
+            className="px-4 py-2 bg-zinc-800/60 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors"
             disabled={state.filters.page <= 1}
           >
             Anterior
           </button>
-          <span className="px-4 py-2 text-sm text-gray-500">
+          <span className="px-3 py-2 text-xs text-zinc-600 font-mono">
             {state.filters.page} / {Math.ceil(state.clipsTotal / 20)}
           </span>
           <button
             onClick={() => dispatch({ type: 'SET_FILTERS', payload: { page: state.filters.page + 1 } })}
-            className="px-4 py-2 bg-gray-800 rounded-lg text-sm text-gray-400 hover:text-white"
-            disabled={state.filters.page >= Math.ceil(state.clipsTotal / 20)}
+            className="px-4 py-2 bg-zinc-800/60 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors"
           >
             Proximo
           </button>

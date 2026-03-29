@@ -20,10 +20,12 @@ export default function App() {
   const Page = pages[state.currentPage] || Dashboard
 
   return (
-    <div className="flex h-screen bg-gray-950">
+    <div className="flex h-screen">
       <Sidebar />
-      <main className="flex-1 overflow-auto p-6">
-        <Page />
+      <main className="flex-1 overflow-auto bg-zinc-950">
+        <div className="max-w-6xl mx-auto px-8 py-8">
+          <Page />
+        </div>
       </main>
     </div>
   )
