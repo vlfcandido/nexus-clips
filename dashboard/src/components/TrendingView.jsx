@@ -1,78 +1,66 @@
-import { TrendingUp, Flame, Plus, RefreshCw } from 'lucide-react'
+import { TrendingUp, Flame, Plus, RefreshCw, ArrowUpRight } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { addSource } from '../api/client'
+import Button from './ui/Button'
+import Badge from './ui/Badge'
+import EmptyState from './ui/EmptyState'
+
+const CAT_VARIANT = { guerra: 'danger', futebol: 'success', política: 'info', outro: 'default' }
 
 export default function TrendingView() {
   const { state, refresh } = useApp()
 
-  async function handleMonitor(trend) {
-    await addSource({
-      source_type: 'twitter',
-      identifier: trend.name,
-      topic: trend.category === 'outro' ? 'entretenimento' : trend.category,
-    })
+  async function handleMonitor(t) {
+    await addSource({ source_type: 'twitter', identifier: t.name, topic: t.category === 'outro' ? 'entretenimento' : t.category })
     refresh()
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-end justify-between anim-fade">
+    <div className="space-y-5">
+      <div className="flex items-end justify-between animate-fade">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">Trending</h1>
-          <p className="text-sm text-zinc-500 mt-1">Topicos em alta no Brasil agora</p>
+          <h1 className="text-xl font-bold text-content-1 tracking-tight">Trending</h1>
+          <p className="text-xs text-content-3 mt-1">Topicos em alta no Brasil — clique + pra monitorar</p>
         </div>
-        <button onClick={refresh}
-          className="flex items-center gap-2 px-3 py-2 bg-zinc-800/60 text-zinc-400 rounded-lg text-xs hover:text-white transition-colors">
-          <RefreshCw className="w-3.5 h-3.5" /> Atualizar
-        </button>
+        <Button variant="secondary" icon={RefreshCw} onClick={refresh}>Atualizar</Button>
       </div>
 
       <div className="space-y-1.5 stagger">
+        {(!state.trending || !state.trending.length) && (
+          <EmptyState icon={TrendingUp} title="Carregando trends..." description="Aguardando dados do Twitter e Google Trends" />
+        )}
         {(state.trending || []).map((t, i) => (
-          <div key={i}
-            className="anim-fade-up flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/60 hover:border-zinc-700/60 transition-all group"
-          >
-            <span className={`text-sm font-bold font-mono w-6 text-center ${i < 3 ? 'text-violet-400' : 'text-zinc-700'}`}>
+          <div key={i} className="flex items-center gap-4 p-3.5 bg-surface-2 border border-stroke-1 rounded-xl hover:border-stroke-2 transition-all group">
+            <span className={`text-xs font-bold font-mono w-5 text-center ${i < 3 ? 'text-accent-light' : 'text-content-4'}`}>
               {String(i + 1).padStart(2, '0')}
             </span>
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-zinc-200">{t.name}</span>
-                {t.should_monitor && <Flame className="w-3.5 h-3.5 text-amber-400" />}
+                <span className="text-[13px] font-medium text-content-1">{t.name}</span>
+                {t.should_monitor && <Flame className="w-3 h-3 text-warning" />}
               </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
-                  t.category === 'guerra' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                  t.category === 'futebol' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                  t.category === 'política' ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' :
-                  'bg-zinc-800 text-zinc-500 border-zinc-700'
-                }`}>{t.category}</span>
-                <span className="text-[10px] text-zinc-600">{t.source}</span>
-                {t.volume > 0 && <span className="text-[10px] text-zinc-600">{t.volume.toLocaleString('pt-BR')} mencoes</span>}
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant={CAT_VARIANT[t.category] || 'default'}>{t.category}</Badge>
+                <span className="text-[10px] text-content-4">{t.source}</span>
+                {t.volume > 0 && <span className="text-[10px] text-content-4">{t.volume.toLocaleString('pt-BR')}</span>}
               </div>
             </div>
 
-            <div className="text-right mr-2">
-              <span className={`text-sm font-bold font-mono ${
-                t.virality >= 7 ? 'text-emerald-400' : t.virality >= 4 ? 'text-amber-400' : 'text-zinc-600'
-              }`}>{t.virality.toFixed(1)}</span>
-              <p className="text-[9px] text-zinc-600">viral</p>
+            {/* Virality score */}
+            <div className="text-center">
+              <div className={`text-sm font-bold font-mono ${t.virality >= 7 ? 'text-success' : t.virality >= 4 ? 'text-warning' : 'text-content-4'}`}>
+                {t.virality.toFixed(1)}
+              </div>
+              <p className="text-[8px] text-content-4 uppercase tracking-widest">viral</p>
             </div>
 
             <button onClick={() => handleMonitor(t)}
-              className="p-2 rounded-lg text-zinc-600 hover:text-violet-400 hover:bg-violet-500/10 transition-colors opacity-0 group-hover:opacity-100">
-              <Plus className="w-4 h-4" />
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-content-4 hover:text-accent-light hover:bg-accent-muted transition-colors opacity-0 group-hover:opacity-100">
+              <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
         ))}
-
-        {(!state.trending || !state.trending.length) && (
-          <div className="text-center py-20 anim-fade">
-            <TrendingUp className="w-10 h-10 text-zinc-800 mx-auto mb-3" />
-            <p className="text-sm text-zinc-600">Carregando trending topics...</p>
-          </div>
-        )}
       </div>
     </div>
   )

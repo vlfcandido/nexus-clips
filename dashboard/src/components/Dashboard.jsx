@@ -1,44 +1,16 @@
-import { Eye, Heart, Film, Upload, TrendingUp, Clock, Flame } from 'lucide-react'
+import { Eye, Heart, Film, Upload, TrendingUp, Clock, Flame, BarChart3 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
-
-function StatCard({ icon: Icon, label, value, change, color = 'violet', delay = 0 }) {
-  const colors = {
-    violet: 'from-violet-500/10 to-transparent border-violet-500/20 text-violet-400',
-    emerald: 'from-emerald-500/10 to-transparent border-emerald-500/20 text-emerald-400',
-    sky: 'from-sky-500/10 to-transparent border-sky-500/20 text-sky-400',
-    rose: 'from-rose-500/10 to-transparent border-rose-500/20 text-rose-400',
-  }
-
-  return (
-    <div
-      className="anim-fade-up bg-zinc-900/50 border border-zinc-800/60 rounded-xl p-5 hover:border-zinc-700/60 transition-colors"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-xs text-zinc-500 font-medium">{label}</span>
-        <div className={`w-8 h-8 rounded-lg bg-gradient-to-b ${colors[color]} flex items-center justify-center border`}>
-          <Icon className="w-4 h-4" />
-        </div>
-      </div>
-      <div className="flex items-end gap-2">
-        <span className="text-2xl font-bold text-zinc-100 tracking-tight">{value}</span>
-        {change && (
-          <span className={`text-[11px] font-mono mb-1 ${change.startsWith('+') ? 'text-emerald-400' : 'text-red-400'}`}>
-            {change}
-          </span>
-        )}
-      </div>
-    </div>
-  )
-}
+import StatCard from './ui/StatCard'
+import Card, { CardHeader } from './ui/Card'
+import Badge from './ui/Badge'
 
 const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 shadow-xl">
-      <p className="text-[10px] text-zinc-400 font-mono">{label}</p>
-      <p className="text-sm font-semibold text-zinc-100">{payload[0].value?.toLocaleString('pt-BR')}</p>
+    <div className="bg-surface-4 border border-stroke-2 rounded-lg px-3 py-1.5 shadow-xl">
+      <p className="text-[9px] text-content-4 font-mono">{label}</p>
+      <p className="text-xs font-semibold text-content-1">{payload[0].value?.toLocaleString('pt-BR')}</p>
     </div>
   )
 }
@@ -48,135 +20,101 @@ export default function Dashboard() {
   const a = state.analytics || {}
 
   const perfData = [
-    { day: 'Seg', views: 12400 },
-    { day: 'Ter', views: 18200 },
-    { day: 'Qua', views: 9800 },
-    { day: 'Qui', views: 24500 },
-    { day: 'Sex', views: 31200 },
-    { day: 'Sab', views: 28700 },
-    { day: 'Dom', views: 35100 },
+    { d: 'Seg', v: 12400 }, { d: 'Ter', v: 18200 }, { d: 'Qua', v: 9800 },
+    { d: 'Qui', v: 24500 }, { d: 'Sex', v: 31200 }, { d: 'Sab', v: 28700 }, { d: 'Dom', v: 35100 },
   ]
 
   const hourData = Array.from({ length: 24 }, (_, i) => ({
-    h: `${String(i).padStart(2, '0')}`,
-    clips: Math.floor(Math.random() * 10) + 1,
+    h: `${String(i).padStart(2, '0')}h`,
+    c: Math.floor(Math.random() * 10) + 1,
   }))
 
   const channels = [
-    { name: 'Guerra Agora', topic: 'guerra', clips: 0, color: 'bg-red-500' },
-    { name: 'Gol a Gol', topic: 'futebol', clips: 0, color: 'bg-emerald-500' },
-    { name: 'Brasil Livre News', topic: 'politica', clips: 0, color: 'bg-sky-500' },
-    { name: 'Povo Informa', topic: 'politica', clips: 0, color: 'bg-amber-500' },
-    { name: 'Viralizou BR', topic: 'trending', clips: 0, color: 'bg-fuchsia-500' },
+    { name: 'Guerra Agora', topic: 'guerra', color: 'danger' },
+    { name: 'Gol a Gol', topic: 'futebol', color: 'success' },
+    { name: 'Brasil Livre News', topic: 'politica', color: 'info' },
+    { name: 'Povo Informa', topic: 'politica', color: 'warning' },
+    { name: 'Viralizou BR', topic: 'trending', color: 'accent' },
   ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="anim-fade">
-        <h1 className="text-2xl font-bold text-zinc-100 tracking-tight">Dashboard</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Visao geral da operacao — {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+      <div className="animate-fade">
+        <h1 className="text-xl font-bold text-content-1 tracking-tight">Dashboard</h1>
+        <p className="text-xs text-content-3 mt-1">
+          {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon={Film} label="Total clips" value={a.total_clips || 0} color="violet" delay={0} />
-        <StatCard icon={Upload} label="Publicados" value={a.published || 0} color="emerald" delay={60} />
-        <StatCard icon={Eye} label="Total views" value={(a.total_views || 0).toLocaleString('pt-BR')} color="sky" delay={120} />
-        <StatCard icon={Heart} label="Total likes" value={(a.total_likes || 0).toLocaleString('pt-BR')} color="rose" delay={180} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger">
+        <StatCard icon={Film} label="Total clips" value={a.total_clips || 0} color="accent" />
+        <StatCard icon={Upload} label="Publicados" value={a.published || 0} color="success" />
+        <StatCard icon={Eye} label="Views" value={(a.total_views || 0).toLocaleString('pt-BR')} color="info" />
+        <StatCard icon={Heart} label="Engajamento" value={(a.total_likes || 0).toLocaleString('pt-BR')} color="danger" />
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Performance */}
-        <div className="lg:col-span-3 anim-fade-up bg-zinc-900/50 border border-zinc-800/60 rounded-xl p-5" style={{ animationDelay: '250ms' }}>
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="text-sm font-semibold text-zinc-200">Performance semanal</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">Views por dia da semana</p>
-            </div>
-          </div>
+        <Card className="lg:col-span-3 animate-in" style={{ animationDelay: '200ms' }}>
+          <CardHeader title="Performance semanal" subtitle="views" />
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={perfData} barSize={28}>
-              <XAxis dataKey="day" stroke="#3f3f46" fontSize={11} fontFamily="IBM Plex Mono" tickLine={false} axisLine={false} />
-              <YAxis stroke="#3f3f46" fontSize={10} fontFamily="IBM Plex Mono" tickLine={false} axisLine={false} width={40} />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(139, 92, 246, 0.05)' }} />
-              <Bar dataKey="views" radius={[6, 6, 0, 0]}>
-                {perfData.map((_, i) => (
-                  <rect key={i} fill={i === perfData.length - 1 ? '#8b5cf6' : '#3f3f46'} />
-                ))}
-              </Bar>
+            <BarChart data={perfData} barSize={24}>
+              <XAxis dataKey="d" stroke="#414b63" fontSize={10} fontFamily="Fira Code" tickLine={false} axisLine={false} />
+              <YAxis stroke="#414b63" fontSize={9} fontFamily="Fira Code" tickLine={false} axisLine={false} width={36} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(99,102,241,0.04)' }} />
+              <Bar dataKey="v" fill="#6366f1" radius={[5, 5, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
 
-        {/* Canais */}
-        <div className="lg:col-span-2 anim-fade-up bg-zinc-900/50 border border-zinc-800/60 rounded-xl p-5" style={{ animationDelay: '350ms' }}>
-          <h3 className="text-sm font-semibold text-zinc-200 mb-4">Canais</h3>
-          <div className="space-y-2.5">
-            {channels.map((ch) => (
-              <div key={ch.name} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-800/40 hover:bg-zinc-800/70 transition-colors">
-                <div className={`w-2 h-2 rounded-full ${ch.color}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-zinc-300 truncate">{ch.name}</p>
-                  <p className="text-[10px] text-zinc-600">{ch.topic}</p>
-                </div>
-                <span className="text-xs font-mono text-zinc-500">{ch.clips}</span>
+        <Card className="lg:col-span-2 animate-in" style={{ animationDelay: '280ms' }}>
+          <CardHeader title="Canais" subtitle="status" />
+          <div className="space-y-1.5">
+            {channels.map(ch => (
+              <div key={ch.name} className="flex items-center gap-3 p-2 rounded-lg bg-surface-3/50 hover:bg-surface-3 transition-colors">
+                <Badge variant={ch.color} dot>{ch.topic}</Badge>
+                <span className="text-xs text-content-2 flex-1 truncate">{ch.name}</span>
+                <span className="text-[10px] font-mono text-success">ON</span>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* Bottom row */}
+      {/* Bottom */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Timeline */}
-        <div className="anim-fade-up bg-zinc-900/50 border border-zinc-800/60 rounded-xl p-5" style={{ animationDelay: '450ms' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-4 h-4 text-zinc-500" />
-            <h3 className="text-sm font-semibold text-zinc-200">Atividade 24h</h3>
-          </div>
+        <Card className="animate-in" style={{ animationDelay: '360ms' }}>
+          <CardHeader title="Atividade 24h" subtitle="timeline" action={<Clock className="w-4 h-4 text-content-4" />} />
           <ResponsiveContainer width="100%" height={120}>
             <AreaChart data={hourData}>
-              <XAxis dataKey="h" stroke="#3f3f46" fontSize={9} fontFamily="IBM Plex Mono" tickLine={false} axisLine={false} interval={3} />
+              <XAxis dataKey="h" stroke="#414b63" fontSize={8} fontFamily="Fira Code" tickLine={false} axisLine={false} interval={3} />
               <Tooltip content={<ChartTooltip />} />
               <defs>
-                <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.2} />
-                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+                <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <Area type="monotone" dataKey="clips" stroke="#8b5cf6" fill="url(#grad)" strokeWidth={1.5} />
+              <Area type="monotone" dataKey="c" stroke="#6366f1" fill="url(#aGrad)" strokeWidth={1.5} />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </Card>
 
-        {/* Trending tags */}
-        <div className="anim-fade-up bg-zinc-900/50 border border-zinc-800/60 rounded-xl p-5" style={{ animationDelay: '550ms' }}>
-          <div className="flex items-center gap-2 mb-4">
-            <Flame className="w-4 h-4 text-zinc-500" />
-            <h3 className="text-sm font-semibold text-zinc-200">Trending agora</h3>
-          </div>
+        <Card className="animate-in" style={{ animationDelay: '440ms' }}>
+          <CardHeader title="Trending agora" subtitle="hot topics" action={<Flame className="w-4 h-4 text-content-4" />} />
           <div className="flex flex-wrap gap-1.5">
-            {(state.trending || []).slice(0, 15).map((t, i) => (
-              <span
-                key={i}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-default ${
-                  t.should_monitor
-                    ? 'bg-violet-500/15 text-violet-300 border border-violet-500/20'
-                    : 'bg-zinc-800/60 text-zinc-500 border border-zinc-800 hover:text-zinc-400'
-                }`}
-              >
+            {(state.trending || []).slice(0, 12).map((t, i) => (
+              <Badge key={i} variant={t.should_monitor ? 'accent' : 'default'}>
                 {t.name}
-              </span>
+              </Badge>
             ))}
             {(!state.trending || !state.trending.length) && (
-              <p className="text-xs text-zinc-600 py-6 w-full text-center">Carregando trending topics...</p>
+              <p className="text-xs text-content-4 py-6 w-full text-center">Aguardando dados do pipeline...</p>
             )}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   )
