@@ -1,13 +1,121 @@
 import { useState, useEffect } from 'react'
-import { MessageSquare, Save, Play, Check, X, ChevronDown, ChevronUp, Thermometer, Hash } from 'lucide-react'
+import {
+  MessageSquare, Save, Play, Check, X, ChevronDown, ChevronUp,
+  Thermometer, Hash, Sparkles, Loader2, Volume2, Image, Target,
+  TrendingUp, Type, FileText, AlertCircle, Eye,
+} from 'lucide-react'
 import { getPrompts, updatePrompt, testPrompt } from '../api/client'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
 import Card from './ui/Card'
 import EmptyState from './ui/EmptyState'
 
-function PromptEditor({ prompt, onSave, onTest }) {
-  const [expanded, setExpanded] = useState(false)
+// ==================== CONFIG ====================
+
+const PROMPT_META = {
+  narration: {
+    group: 'video',
+    icon: Volume2,
+    color: 'from-rose-500 to-orange-500',
+    badge: 'danger',
+    title: 'Narracao do Video',
+    subtitle: 'O que a voz fala',
+    help: 'Este prompt controla EXATAMENTE o texto que a voz narra. Mude o tom, estilo, tamanho e estrutura aqui.',
+    tips: [
+      'Use "fale como..." pra definir o tom (jornalista, creator, narrador)',
+      'Defina o tamanho: "maximo 80 palavras, frases curtas"',
+      'Estruture: "comece com pergunta, depois fato, depois opiniao"',
+      'Teste com o botao abaixo antes de salvar',
+    ],
+  },
+  image_search: {
+    group: 'video',
+    icon: Image,
+    color: 'from-cyan-500 to-blue-500',
+    badge: 'info',
+    title: 'Busca de Imagens',
+    subtitle: 'Que fotos aparecem no video',
+    help: 'Controla as palavras usadas pra buscar imagens no Pexels. Quanto mais especifico, melhores as imagens.',
+    tips: [
+      'Seja especifico: "soldados americanos no deserto" > "guerra"',
+      'Mencione lugares, pessoas, objetos do conteudo',
+    ],
+  },
+  classify: {
+    group: 'decisao',
+    icon: Target,
+    color: 'from-violet-500 to-indigo-500',
+    badge: 'accent',
+    title: 'Classificador',
+    subtitle: 'Decide se vira video',
+    help: 'Analisa cada noticia e decide: e relevante? Qual topico? Qual viralidade? Se mudar os criterios aqui, muda o que vira video.',
+    tips: [
+      'Aumente viralidade minima pra ser mais seletivo',
+      'Adicione categorias novas se quiser',
+    ],
+  },
+  strategy: {
+    group: 'decisao',
+    icon: FileText,
+    color: 'from-amber-500 to-yellow-500',
+    badge: 'warning',
+    title: 'Estrategista',
+    subtitle: 'Formato e plataforma',
+    help: 'Decide o formato (short, reel), plataforma prioritaria, duracao e se usa voz ou nao.',
+  },
+  growth_hook: {
+    group: 'growth',
+    icon: TrendingUp,
+    color: 'from-emerald-500 to-green-500',
+    badge: 'success',
+    title: 'Growth Hook',
+    subtitle: 'Gancho de abertura',
+    help: 'Gera o gancho que prende nos primeiros 2 segundos. Crucial pra viralizar.',
+    tips: [
+      'Hooks que funcionam: perguntas, numeros chocantes, "voce nao vai acreditar"',
+      'Peca CTAs que geram comentarios (algoritmo ama comentarios)',
+    ],
+  },
+  caption_tiktok: {
+    group: 'captions',
+    icon: Type,
+    color: 'from-pink-500 to-rose-500',
+    badge: 'danger',
+    title: 'Caption TikTok',
+    subtitle: 'Titulo e hashtags',
+    help: 'Texto que aparece no TikTok. Maximo 150 chars no titulo, 5-8 hashtags.',
+  },
+  caption_instagram: {
+    group: 'captions',
+    icon: Type,
+    color: 'from-purple-500 to-pink-500',
+    badge: 'accent',
+    title: 'Caption Instagram',
+    subtitle: 'Reels description',
+    help: 'Caption do Instagram. Pode ser mais longa, 20-30 hashtags.',
+  },
+  caption_youtube: {
+    group: 'captions',
+    icon: Type,
+    color: 'from-red-500 to-rose-500',
+    badge: 'danger',
+    title: 'Caption YouTube',
+    subtitle: 'Titulo SEO + descricao',
+    help: 'Titulo otimizado pra SEO do YouTube. Descricao com keywords.',
+  },
+}
+
+const GROUP_INFO = {
+  video: { label: 'Producao do Video', desc: 'Controlam o que aparece e o que a voz fala', icon: '🎬' },
+  decisao: { label: 'Decisoes da IA', desc: 'Controlam o que vira video e como', icon: '🎯' },
+  growth: { label: 'Crescimento', desc: 'Estrategias pra viralizar e engajar', icon: '🚀' },
+  captions: { label: 'Textos de Publicacao', desc: 'Titulos e descricoes por plataforma', icon: '✍️' },
+}
+
+// ==================== PROMPT CARD ====================
+
+function PromptCard({ prompt, meta, onSave, onTest }) {
+  const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({
     system_prompt: prompt.system_prompt,
@@ -19,6 +127,8 @@ function PromptEditor({ prompt, onSave, onTest }) {
   const [testing, setTesting] = useState(false)
   const [saved, setSaved] = useState(false)
 
+  const Icon = meta?.icon || MessageSquare
+
   async function handleSave() {
     await onSave(prompt.id, form)
     setSaved(true)
@@ -29,236 +139,245 @@ function PromptEditor({ prompt, onSave, onTest }) {
   async function handleTest() {
     setTesting(true)
     setTestResult(null)
-    const result = await onTest(prompt.id)
-    setTestResult(result)
+    const r = await onTest(prompt.id)
+    setTestResult(r)
     setTesting(false)
   }
 
-  // Conta placeholders no template
-  const placeholders = (form.user_prompt_template.match(/\{(\w+)\}/g) || [])
-    .map(p => p.replace(/[{}]/g, ''))
-    .filter((v, i, a) => a.indexOf(v) === i)
+  // Conta placeholders
+  const vars = [...new Set((form.user_prompt_template.match(/\{(\w+)\}/g) || []).map(p => p.replace(/[{}]/g, '')))]
 
   return (
-    <div className="bg-surface-2 border border-stroke-1 rounded-2xl overflow-hidden">
+    <div className={`bg-surface-2 border rounded-2xl overflow-hidden transition-all duration-200 ${
+      open ? 'border-stroke-2 shadow-lg shadow-black/10' : 'border-stroke-1 hover:border-stroke-2'
+    }`}>
       {/* Header — sempre visível */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-3 p-4 hover:bg-surface-3/30 transition-colors text-left"
-      >
-        <div className="w-8 h-8 rounded-lg bg-accent-muted flex items-center justify-center flex-shrink-0">
-          <MessageSquare className="w-4 h-4 text-accent-light" />
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 p-4 text-left group">
+        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${meta?.color || 'from-gray-500 to-gray-600'} flex items-center justify-center shadow-md flex-shrink-0`}>
+          <Icon className="w-5 h-5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-content-1">{prompt.name}</span>
-            <Badge variant="default">{prompt.key}</Badge>
-            {!prompt.active && <Badge variant="danger">Desativado</Badge>}
+            <span className="text-sm font-semibold text-content-1">{meta?.title || prompt.name}</span>
             {saved && <Badge variant="success"><Check className="w-2.5 h-2.5" /> Salvo</Badge>}
           </div>
-          <p className="text-[11px] text-content-3 mt-0.5 truncate">{prompt.description}</p>
+          <p className="text-[11px] text-content-3 mt-0.5">{meta?.subtitle || prompt.description}</p>
         </div>
-        <div className="flex items-center gap-2 text-content-4">
-          <span className="text-[9px] font-mono">temp:{prompt.temperature}</span>
-          <span className="text-[9px] font-mono">max:{prompt.max_tokens}</span>
-          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] font-mono text-content-4 hidden sm:block">temp: {prompt.temperature}</span>
+          {open ? <ChevronUp className="w-4 h-4 text-content-4" /> : <ChevronDown className="w-4 h-4 text-content-4 group-hover:text-content-3" />}
         </div>
       </button>
 
-      {/* Expanded content */}
-      {expanded && (
-        <div className="border-t border-stroke-1 p-4 space-y-4 animate-in-fast">
-          {/* System prompt */}
-          <div>
-            <label className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-medium text-content-3">System Prompt</span>
-              {!editing && (
-                <button onClick={() => setEditing(true)} className="text-[10px] text-accent-light hover:underline">
-                  Editar
-                </button>
-              )}
-            </label>
-            <textarea
-              value={form.system_prompt}
-              onChange={e => setForm({ ...form, system_prompt: e.target.value })}
-              readOnly={!editing}
-              rows={3}
-              className={`w-full bg-surface-3 border rounded-lg px-3 py-2 text-xs font-mono text-content-2 resize-y outline-none ${
-                editing ? 'border-accent/40 focus:border-accent/60' : 'border-stroke-2'
-              }`}
-            />
-          </div>
-
-          {/* User prompt template */}
-          <div>
-            <label className="flex items-center gap-2 mb-1.5">
-              <span className="text-[11px] font-medium text-content-3">User Prompt Template</span>
-              {placeholders.length > 0 && (
-                <span className="text-[9px] text-content-4">
-                  Vars: {placeholders.map(p => `{${p}}`).join(', ')}
-                </span>
-              )}
-            </label>
-            <textarea
-              value={form.user_prompt_template}
-              onChange={e => setForm({ ...form, user_prompt_template: e.target.value })}
-              readOnly={!editing}
-              rows={10}
-              className={`w-full bg-surface-3 border rounded-lg px-3 py-2 text-xs font-mono text-content-2 resize-y outline-none leading-relaxed ${
-                editing ? 'border-accent/40 focus:border-accent/60' : 'border-stroke-2'
-              }`}
-            />
-          </div>
-
-          {/* Temperature + Max tokens */}
-          {editing && (
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Thermometer className="w-3.5 h-3.5 text-content-4" />
-                <span className="text-[11px] text-content-3">Temperature:</span>
-                <input type="number" min="0" max="1" step="0.1"
-                  value={form.temperature}
-                  onChange={e => setForm({ ...form, temperature: parseFloat(e.target.value) || 0.3 })}
-                  className="w-16 bg-surface-3 border border-stroke-2 rounded px-2 py-1 text-xs font-mono text-content-1 outline-none focus:border-accent/50"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Hash className="w-3.5 h-3.5 text-content-4" />
-                <span className="text-[11px] text-content-3">Max tokens:</span>
-                <input type="number" min="100" max="2000" step="50"
-                  value={form.max_tokens}
-                  onChange={e => setForm({ ...form, max_tokens: parseInt(e.target.value) || 600 })}
-                  className="w-20 bg-surface-3 border border-stroke-2 rounded px-2 py-1 text-xs font-mono text-content-1 outline-none focus:border-accent/50"
-                />
+      {/* Expanded */}
+      {open && (
+        <div className="border-t border-stroke-1 animate-in-fast">
+          {/* Help section */}
+          {meta?.help && (
+            <div className="px-4 pt-3 pb-2">
+              <div className="flex items-start gap-2 p-3 bg-accent-muted/30 border border-accent/10 rounded-xl">
+                <AlertCircle className="w-4 h-4 text-accent-light flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-[11px] text-content-2 leading-relaxed">{meta.help}</p>
+                  {meta.tips && (
+                    <ul className="mt-2 space-y-1">
+                      {meta.tips.map((tip, i) => (
+                        <li key={i} className="text-[10px] text-content-3 flex items-start gap-1.5">
+                          <span className="text-accent-light mt-0.5">→</span> {tip}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 pt-2 border-t border-stroke-1">
+          <div className="px-4 pb-4 space-y-3">
+            {/* System prompt */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[10px] font-semibold text-content-3 uppercase tracking-wider">Instrucao do sistema</label>
+                {!editing && (
+                  <button onClick={() => setEditing(true)} className="text-[10px] text-accent-light hover:underline font-medium">
+                    Editar
+                  </button>
+                )}
+              </div>
+              <textarea
+                value={form.system_prompt}
+                onChange={e => setForm({ ...form, system_prompt: e.target.value })}
+                readOnly={!editing}
+                rows={2}
+                className={`w-full bg-surface-3/50 border rounded-xl px-3 py-2.5 text-xs font-mono text-content-2 resize-y outline-none leading-relaxed transition-all ${
+                  editing ? 'border-accent/30 bg-surface-3 focus:border-accent/50 focus:ring-1 focus:ring-accent/20' : 'border-stroke-1'
+                }`}
+              />
+            </div>
+
+            {/* User prompt */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <label className="text-[10px] font-semibold text-content-3 uppercase tracking-wider">Template do prompt</label>
+                {vars.length > 0 && (
+                  <div className="flex gap-1">
+                    {vars.slice(0, 5).map(v => (
+                      <span key={v} className="px-1.5 py-0.5 bg-accent-muted rounded text-[8px] font-mono text-accent-light">{`{${v}}`}</span>
+                    ))}
+                    {vars.length > 5 && <span className="text-[8px] text-content-4">+{vars.length - 5}</span>}
+                  </div>
+                )}
+              </div>
+              <textarea
+                value={form.user_prompt_template}
+                onChange={e => setForm({ ...form, user_prompt_template: e.target.value })}
+                readOnly={!editing}
+                rows={8}
+                className={`w-full bg-surface-3/50 border rounded-xl px-3 py-2.5 text-xs font-mono text-content-2 resize-y outline-none leading-relaxed transition-all ${
+                  editing ? 'border-accent/30 bg-surface-3 focus:border-accent/50 focus:ring-1 focus:ring-accent/20' : 'border-stroke-1'
+                }`}
+              />
+            </div>
+
+            {/* Settings row */}
             {editing && (
-              <>
-                <Button size="sm" icon={Save} onClick={handleSave}>Salvar</Button>
-                <Button size="sm" variant="secondary" onClick={() => {
-                  setEditing(false)
-                  setForm({
-                    system_prompt: prompt.system_prompt,
-                    user_prompt_template: prompt.user_prompt_template,
-                    temperature: prompt.temperature,
-                    max_tokens: prompt.max_tokens,
-                  })
-                }}>Cancelar</Button>
-              </>
+              <div className="flex items-center gap-4 p-3 bg-surface-3/30 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <Thermometer className="w-3.5 h-3.5 text-content-4" />
+                  <label className="text-[10px] text-content-3">Criatividade:</label>
+                  <input type="range" min="0" max="1" step="0.1" value={form.temperature}
+                    onChange={e => setForm({ ...form, temperature: parseFloat(e.target.value) })}
+                    className="w-20" />
+                  <span className="text-[10px] font-mono text-accent-light w-6">{form.temperature}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Hash className="w-3.5 h-3.5 text-content-4" />
+                  <label className="text-[10px] text-content-3">Max tokens:</label>
+                  <input type="number" min="100" max="2000" step="50" value={form.max_tokens}
+                    onChange={e => setForm({ ...form, max_tokens: parseInt(e.target.value) || 600 })}
+                    className="w-16 bg-surface-4 border border-stroke-2 rounded-lg px-2 py-1 text-[10px] font-mono text-content-1 outline-none" />
+                </div>
+              </div>
             )}
-            <Button size="sm" variant="secondary" icon={Play} onClick={handleTest}
-              className={testing ? 'opacity-50 pointer-events-none' : ''}>
-              {testing ? 'Testando...' : 'Testar prompt'}
-            </Button>
-          </div>
 
-          {/* Test result */}
-          {testResult && (
-            <div className={`rounded-lg p-3 text-xs font-mono ${
-              testResult.status === 'ok'
-                ? 'bg-success-muted border border-success/20'
-                : 'bg-danger-muted border border-danger/20'
-            }`}>
-              <p className={`font-semibold mb-1 ${testResult.status === 'ok' ? 'text-success' : 'text-danger'}`}>
-                {testResult.status === 'ok' ? 'Sucesso!' : 'Erro:'}
-              </p>
-              <pre className="text-content-2 whitespace-pre-wrap text-[10px] max-h-40 overflow-auto">
-                {testResult.status === 'ok'
-                  ? JSON.stringify(testResult.result, null, 2)
-                  : testResult.error}
-              </pre>
+            {/* Actions */}
+            <div className="flex items-center gap-2 pt-1">
+              {editing ? (
+                <>
+                  <Button size="sm" icon={Save} onClick={handleSave}>Salvar</Button>
+                  <Button size="sm" variant="secondary" onClick={() => {
+                    setEditing(false)
+                    setForm({ system_prompt: prompt.system_prompt, user_prompt_template: prompt.user_prompt_template, temperature: prompt.temperature, max_tokens: prompt.max_tokens })
+                  }}>Cancelar</Button>
+                </>
+              ) : null}
+              <Button size="sm" variant="secondary" icon={testing ? Loader2 : Play} onClick={handleTest}
+                className={testing ? 'opacity-50 pointer-events-none' : ''}>
+                {testing ? 'Testando...' : 'Testar'}
+              </Button>
+              <Button size="sm" variant="ghost" icon={Eye} onClick={() => setOpen(false)}>Fechar</Button>
             </div>
-          )}
+
+            {/* Test result */}
+            {testResult && (
+              <div className={`p-3 rounded-xl text-xs ${
+                testResult.status === 'ok' ? 'bg-success-muted border border-success/20' : 'bg-danger-muted border border-danger/20'
+              }`}>
+                <p className={`font-semibold mb-1.5 ${testResult.status === 'ok' ? 'text-success' : 'text-danger'}`}>
+                  {testResult.status === 'ok' ? '✅ Resultado do teste:' : '❌ Erro:'}
+                </p>
+                <pre className="text-content-2 whitespace-pre-wrap text-[10px] font-mono max-h-48 overflow-auto leading-relaxed">
+                  {testResult.status === 'ok' ? JSON.stringify(testResult.result, null, 2) : testResult.error}
+                </pre>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-// Categorias visuais pra agrupar prompts
-const PROMPT_CATEGORIES = {
-  classify: { group: 'Decisao', icon: '🎯', impact: 'Decide se a noticia vira video ou nao' },
-  strategy: { group: 'Decisao', icon: '📋', impact: 'Escolhe formato, plataforma e duracao do video' },
-  narration: { group: 'Video', icon: '🎙️', impact: 'Texto que a voz fala no video — TOM e CONTEUDO' },
-  caption_tiktok: { group: 'Publicacao', icon: '🎵', impact: 'Titulo e descricao do TikTok' },
-  caption_instagram: { group: 'Publicacao', icon: '📸', impact: 'Titulo e descricao do Instagram' },
-  caption_youtube: { group: 'Publicacao', icon: '▶️', impact: 'Titulo e descricao do YouTube' },
-  growth_hook: { group: 'Growth', icon: '🚀', impact: 'Gancho de abertura pra prender atencao' },
-  image_search: { group: 'Video', icon: '🖼️', impact: 'Que imagens aparecem no video' },
-}
+// ==================== MAIN VIEW ====================
 
 export default function PromptsView() {
   const [prompts, setPrompts] = useState([])
 
   async function load() {
-    try {
-      const data = await getPrompts()
-      setPrompts(data.prompts)
-    } catch {}
+    try { const d = await getPrompts(); setPrompts(d.prompts) } catch {}
   }
-
   useEffect(() => { load() }, [])
 
-  async function handleSave(id, data) {
-    await updatePrompt(id, data)
-    load()
-  }
+  async function handleSave(id, data) { await updatePrompt(id, data); load() }
+  async function handleTest(id) { return await testPrompt(id) }
 
-  async function handleTest(id) {
-    return await testPrompt(id)
-  }
-
-  // Agrupa por categoria
+  // Agrupa
   const groups = {}
   prompts.forEach(p => {
-    const cat = PROMPT_CATEGORIES[p.key] || { group: 'Outro', icon: '📎', impact: '' }
-    if (!groups[cat.group]) groups[cat.group] = []
-    groups[cat.group].push({ ...p, ...cat })
+    const meta = PROMPT_META[p.key]
+    const g = meta?.group || 'outro'
+    if (!groups[g]) groups[g] = []
+    groups[g].push(p)
   })
 
+  const groupOrder = ['video', 'decisao', 'growth', 'captions']
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 max-w-3xl">
       <div className="animate-fade">
-        <h1 className="text-xl font-bold text-content-1 tracking-tight">Prompts</h1>
-        <p className="text-xs text-content-3 mt-1">
-          Controle tudo que a IA faz — desde decidir se uma noticia vira video ate o que a voz fala.
-        </p>
-      </div>
-
-      {/* Guia rápido */}
-      <div className="bg-accent-muted border border-accent/20 rounded-xl p-4 animate-in" style={{ animationDelay: '50ms' }}>
-        <p className="text-xs text-accent-light mb-2"><strong>Como funciona:</strong></p>
-        <div className="grid grid-cols-2 gap-2 text-[10px] text-content-3">
-          <div className="flex items-center gap-2"><span>🎙️</span> <strong className="text-content-1">Narracao</strong> = o que a voz fala no video</div>
-          <div className="flex items-center gap-2"><span>🖼️</span> <strong className="text-content-1">Imagens</strong> = que fotos aparecem no fundo</div>
-          <div className="flex items-center gap-2"><span>🎯</span> <strong className="text-content-1">Classificador</strong> = decide se vira video ou nao</div>
-          <div className="flex items-center gap-2"><span>🚀</span> <strong className="text-content-1">Growth</strong> = gancho pra prender atencao</div>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-fuchsia-500 flex items-center justify-center shadow-lg shadow-accent/15">
+            <Sparkles className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-content-1 tracking-tight">Prompts da IA</h1>
+            <p className="text-xs text-content-3 mt-0.5">Controle tudo que a IA faz — do texto narrado ate as hashtags</p>
+          </div>
         </div>
-        <p className="text-[9px] text-content-4 mt-2">Edite o texto, ajuste o tom, e clique "Testar" pra ver o resultado antes de salvar.</p>
       </div>
 
-      {/* Prompts agrupados por categoria */}
+      {/* Quick guide */}
+      <div className="grid grid-cols-4 gap-2 animate-in" style={{ animationDelay: '50ms' }}>
+        {groupOrder.map(g => {
+          const info = GROUP_INFO[g]
+          if (!info) return null
+          const count = groups[g]?.length || 0
+          return (
+            <div key={g} className="bg-surface-2 border border-stroke-1 rounded-xl p-3 text-center hover:border-stroke-2 transition-colors">
+              <span className="text-xl block">{info.icon}</span>
+              <p className="text-[11px] font-semibold text-content-1 mt-1">{info.label}</p>
+              <p className="text-[9px] text-content-4 mt-0.5">{count} {count === 1 ? 'prompt' : 'prompts'}</p>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Grouped prompts */}
       {prompts.length === 0 && <EmptyState icon={MessageSquare} title="Carregando prompts..." />}
 
-      {Object.entries(groups).map(([groupName, groupPrompts]) => (
-        <div key={groupName} className="space-y-2">
-          <h2 className="text-xs font-semibold text-content-3 uppercase tracking-wider px-1 pt-2">{groupName}</h2>
-          {groupPrompts.map(p => (
-            <div key={p.id}>
-              {/* Tag de impacto */}
-              <div className="flex items-center gap-2 mb-1 px-1">
-                <span className="text-sm">{p.icon}</span>
-                <span className="text-[10px] text-content-4">{p.impact}</span>
+      {groupOrder.map(g => {
+        const info = GROUP_INFO[g]
+        const items = groups[g]
+        if (!info || !items?.length) return null
+
+        return (
+          <div key={g} className="space-y-2">
+            <div className="flex items-center gap-2 px-1">
+              <span className="text-base">{info.icon}</span>
+              <div>
+                <h2 className="text-xs font-bold text-content-1">{info.label}</h2>
+                <p className="text-[9px] text-content-4">{info.desc}</p>
               </div>
-              <PromptEditor prompt={p} onSave={handleSave} onTest={handleTest} />
             </div>
-          ))}
-        </div>
-      ))}
+
+            <div className="space-y-2 stagger">
+              {items.map(p => (
+                <PromptCard key={p.id} prompt={p} meta={PROMPT_META[p.key]} onSave={handleSave} onTest={handleTest} />
+              ))}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
