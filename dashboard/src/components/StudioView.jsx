@@ -42,20 +42,6 @@ const VOICES = [
     audioSrc: '/media/samples/voice_thalita.mp3' },
 ]
 
-const VISUAL_STYLES = [
-  { id: 'news', label: 'News', icon: '📺',
-    desc: 'Estilo jornalistico',
-    preview: ['Barra de titulo no topo', 'Badge de categoria', 'Overlay escuro sobre imagens', 'Barra de progresso'] },
-  { id: 'cinematic', label: 'Cinematico', icon: '🎬',
-    desc: 'Imagens grandes',
-    preview: ['Letterbox (barras pretas)', 'Texto so embaixo', 'Imagens em fullscreen', 'Minimo de overlays'] },
-  { id: 'tiktok', label: 'TikTok', icon: '📱',
-    desc: 'Texto central grande',
-    preview: ['Titulo grande no centro', 'Legenda word-by-word', 'Pouco overlay', 'Foco na legenda'] },
-  { id: 'minimal', label: 'Minimal', icon: '◻️',
-    desc: 'Limpo e simples',
-    preview: ['Titulo centrado', 'Sem badge', 'Sem barras', 'Fundo com imagens suaves'] },
-]
 
 const SUBTITLE_STYLES = [
   { id: 'word_by_word', label: 'Palavra por palavra', icon: '💬',
@@ -315,7 +301,8 @@ export default function StudioView() {
 
   const selectedMood = MOODS.find(m => m.id === brief.mood)
   const selectedVoice = VOICES.find(v => v.value === brief.voice)
-  const selectedVisual = VISUAL_STYLES.find(v => v.id === brief.visual_style)
+  const selectedTemplate = templates.find(t => t.id === brief.template_id)
+  const selectedVisual = selectedTemplate ? { label: selectedTemplate.name, icon: { news: '📺', tiktok: '📱', cinematic: '🎬', minimal: '◻️', custom: '🎨' }[selectedTemplate.category] || '📎' } : { label: brief.visual_style, icon: '📎' }
   const selectedSub = SUBTITLE_STYLES.find(s => s.id === brief.subtitle_style)
 
   async function handleGenerate() {
@@ -442,56 +429,37 @@ export default function StudioView() {
         </div>
       </Section>
 
-      {/* ===== TEMPLATE VISUAL ===== */}
+      {/* ===== LAYOUT VISUAL (unificado: templates do DB) ===== */}
       {templates.length > 0 && (
-        <Section icon={Layout} title="Template Visual">
-          <div className="grid grid-cols-4 gap-2">
-            {templates.map(t => (
-              <button key={t.id} onClick={() => set('template_id', t.id)}
-                className={`p-3 rounded-xl border text-left transition-all ${
-                  brief.template_id === t.id
-                    ? 'border-accent/40 bg-accent-muted ring-1 ring-accent/20'
-                    : 'border-stroke-1 bg-surface-3/20 hover:border-stroke-2'
-                }`}>
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="text-xs font-bold text-content-1">{t.name}</span>
-                  {t.is_default && <Star className="w-2.5 h-2.5 text-warning fill-warning" />}
-                </div>
-                <p className="text-[9px] text-content-4 leading-snug line-clamp-2">{t.description}</p>
-              </button>
-            ))}
+        <Section icon={Layout} title="Layout do Video">
+          <p className="text-[9px] text-content-4 mb-2">Escolha o layout visual. Edite ou crie novos em Templates.</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            {templates.filter(t => t.active).map(t => {
+              const isSelected = brief.template_id === t.id
+              const categoryIcon = { news: '📺', tiktok: '📱', cinematic: '🎬', minimal: '◻️', custom: '🎨' }
+              return (
+                <button key={t.id} onClick={() => { set('template_id', t.id); set('visual_style', t.category) }}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    isSelected
+                      ? 'border-accent/40 bg-accent-muted ring-1 ring-accent/20'
+                      : 'border-stroke-1 bg-surface-3/20 hover:border-stroke-2'
+                  }`}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-base">{categoryIcon[t.category] || '📎'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[11px] font-bold text-content-1 truncate">{t.name}</span>
+                        {t.is_default && <Star className="w-2.5 h-2.5 text-warning fill-warning flex-shrink-0" />}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-content-4 leading-snug line-clamp-2">{t.description}</p>
+                </button>
+              )
+            })}
           </div>
         </Section>
       )}
-
-      {/* ===== VISUAL STYLE — com preview ===== */}
-      <Section icon={Image} title="Estilo Visual">
-        <div className="grid grid-cols-2 gap-2">
-          {VISUAL_STYLES.map(v => (
-            <button key={v.id} onClick={() => set('visual_style', v.id)}
-              className={`p-3 rounded-xl border text-left transition-all ${
-                brief.visual_style === v.id
-                  ? 'border-accent/40 bg-accent-muted ring-1 ring-accent/20'
-                  : 'border-stroke-1 bg-surface-3/20 hover:border-stroke-2'
-              }`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">{v.icon}</span>
-                <div>
-                  <span className="text-xs font-bold text-content-1">{v.label}</span>
-                  <span className="text-[9px] text-content-4 block">{v.desc}</span>
-                </div>
-              </div>
-              <ul className="space-y-0.5">
-                {v.preview.map((p, i) => (
-                  <li key={i} className="text-[9px] text-content-3 flex items-center gap-1">
-                    <span className="w-1 h-1 rounded-full bg-accent-light/50" /> {p}
-                  </li>
-                ))}
-              </ul>
-            </button>
-          ))}
-        </div>
-      </Section>
 
       {/* ===== LEGENDAS — com preview ===== */}
       <Section icon={Type} title="Legendas">
