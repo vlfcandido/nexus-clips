@@ -29,6 +29,7 @@ export const preparePublish = (clipId, accountId) => request(`/clips/${clipId}/p
 // YouTube OAuth
 export const getYouTubeAuthUrl = (accountId) => request(`/youtube/auth-url/${accountId}`)
 export const getYouTubeSetupGuide = (accountId) => request(`/youtube/setup-guide/${accountId}`)
+export const getYouTubeSetupGuide = (accountId) => request(`/youtube/setup-guide/${accountId}`)
 export const uploadToYouTube = (clipId, accountId, title, description, tags) =>
   request(`/youtube/upload/${clipId}/${accountId}?title=${encodeURIComponent(title)}&description=${encodeURIComponent(description)}&tags=${encodeURIComponent(tags)}`, { method: 'POST' })
 

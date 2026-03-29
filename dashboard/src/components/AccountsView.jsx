@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Users, Plus, Trash2, X, ToggleLeft, ToggleRight, Eye, Film, ExternalLink, Shield, Check, Wifi, Loader2, RefreshCw, HelpCircle, Sparkles, Key } from 'lucide-react'
-import { getAccounts, createAccount, updateAccount, deleteAccount, verifyAccount, syncAccount, diagnoseAccount, getYouTubeAuthUrl } from '../api/client'
+import { getAccounts, createAccount, updateAccount, deleteAccount, verifyAccount, syncAccount, diagnoseAccount, getYouTubeAuthUrl, getYouTubeSetupGuide } from '../api/client'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
 import Card, { CardHeader } from './ui/Card'
@@ -40,6 +40,7 @@ export default function AccountsView() {
   const [diagnosing, setDiagnosing] = useState(null)
   const [verifyResults, setVerifyResults] = useState({})
   const [diagnoseResults, setDiagnoseResults] = useState({})
+  const [setupGuide, setSetupGuide] = useState({}) // {accountId: guide}
   const [form, setForm] = useState({
     name: '', platform: 'tiktok', username: '', topics: [],
     auto_publish: false, max_posts_per_day: 5,
@@ -454,20 +455,75 @@ export default function AccountsView() {
                   </button>
                 )}
 
-                {/* Botão Autorizar YouTube */}
-                {acc.platform === 'youtube' && acc.has_credentials && verifyResults[acc.id]?.status !== 'connected' && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const r = await getYouTubeAuthUrl(acc.id)
-                        if (r.auth_url) window.open(r.auth_url, '_blank')
-                        else alert(r.error || 'Erro ao gerar URL')
-                      } catch (e) { alert(e.message) }
-                    }}
-                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-danger-muted rounded-lg text-danger text-[10px] font-medium hover:bg-danger/20 transition-colors"
-                  >
-                    <Key className="w-3 h-3" /> Autorizar YouTube (OAuth2)
-                  </button>
+                {/* YouTube OAuth Wizard */}
+                {acc.platform === 'youtube' && (
+                  <div className="mt-2">
+                    {!setupGuide[acc.id] ? (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const guide = await getYouTubeSetupGuide(acc.id)
+                            setSetupGuide(prev => ({ ...prev, [acc.id]: guide }))
+                          } catch {}
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-muted rounded-lg text-accent-light text-[10px] font-medium hover:bg-accent/20 transition-colors"
+                      >
+                        <Key className="w-3 h-3" /> Ver guia de configuracao YouTube
+                      </button>
+                    ) : (
+                      <div className="p-3 bg-surface-3/30 border border-stroke-1 rounded-xl space-y-3">
+                        <p className="text-[11px] font-semibold text-content-1 flex items-center gap-1.5">
+                          <Key className="w-3.5 h-3.5 text-danger" /> Configuracao YouTube — Passo {setupGuide[acc.id].current_step} de {setupGuide[acc.id].total_steps}
+                        </p>
+                        {setupGuide[acc.id].steps?.map((step) => (
+                          <div key={step.number} className={`flex gap-3 ${step.done ? 'opacity-50' : ''}`}>
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                              step.done ? 'bg-success text-white' : step.number === setupGuide[acc.id].current_step ? 'bg-accent text-white' : 'bg-surface-4 text-content-3'
+                            }`}>
+                              {step.done ? <Check className="w-3 h-3" /> : step.number}
+                            </div>
+                            <div className="flex-1">
+                              <p className={`text-[11px] font-medium ${step.done ? 'text-content-4 line-through' : 'text-content-1'}`}>{step.title}</p>
+                              {!step.done && step.instructions && (
+                                <ul className="mt-1 space-y-0.5">
+                                  {step.instructions.map((inst, i) => (
+                                    <li key={i} className="text-[9px] text-content-3 flex items-start gap-1">
+                                      <span className="text-accent-light mt-0.5">→</span> {inst}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              {!step.done && step.link && (
+                                <a href={step.link} target="_blank" className="text-[9px] text-accent-light hover:underline mt-1 inline-block">
+                                  Abrir no Google Cloud ↗
+                                </a>
+                              )}
+                              {!step.done && step.action === 'authorize' && acc.has_credentials && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const r = await getYouTubeAuthUrl(acc.id)
+                                      if (r.auth_url) window.open(r.auth_url, '_blank')
+                                      else alert(r.error || 'Erro')
+                                    } catch (e) { alert(e.message) }
+                                  }}
+                                  className="mt-1.5 flex items-center gap-1.5 px-3 py-1.5 bg-danger text-white rounded-lg text-[10px] font-semibold hover:bg-red-600 transition-colors"
+                                >
+                                  <Key className="w-3 h-3" /> Autorizar agora
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        <button onClick={async () => {
+                          const guide = await getYouTubeSetupGuide(acc.id)
+                          setSetupGuide(prev => ({ ...prev, [acc.id]: guide }))
+                        }} className="text-[9px] text-accent-light hover:underline">
+                          Atualizar status
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
