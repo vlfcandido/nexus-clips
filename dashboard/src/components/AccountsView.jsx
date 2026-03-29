@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Users, Plus, Trash2, X, ToggleLeft, ToggleRight, Eye, Film, ExternalLink, Shield, Check, Wifi, WifiOff, Loader2 } from 'lucide-react'
-import { getAccounts, createAccount, updateAccount, deleteAccount, verifyAccount } from '../api/client'
+import { Users, Plus, Trash2, X, ToggleLeft, ToggleRight, Eye, Film, ExternalLink, Shield, Check, Wifi, Loader2, RefreshCw } from 'lucide-react'
+import { getAccounts, createAccount, updateAccount, deleteAccount, verifyAccount, syncAccount } from '../api/client'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
 import Card, { CardHeader } from './ui/Card'
@@ -35,8 +35,9 @@ export default function AccountsView() {
   const [accounts, setAccounts] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
-  const [verifying, setVerifying] = useState(null) // account id being verified
-  const [verifyResults, setVerifyResults] = useState({}) // {accountId: result}
+  const [verifying, setVerifying] = useState(null)
+  const [syncing, setSyncing] = useState(null)
+  const [verifyResults, setVerifyResults] = useState({})
   const [form, setForm] = useState({
     name: '', platform: 'tiktok', username: '', topics: [],
     auto_publish: false, max_posts_per_day: 5,
@@ -288,6 +289,19 @@ export default function AccountsView() {
                   className={`p-1.5 rounded-lg transition-colors ${verifying === acc.id ? 'text-accent-light' : 'text-content-4 hover:text-accent-light hover:bg-accent-muted'}`}
                   title="Verificar conexao">
                   {verifying === acc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wifi className="w-4 h-4" />}
+                </button>
+                <button onClick={async () => {
+                  setSyncing(acc.id)
+                  try {
+                    const r = await syncAccount(acc.id)
+                    if (r.status === 'synced') load()
+                    else setVerifyResults(prev => ({ ...prev, [acc.id]: { status: r.status, message: r.error || r.message || 'Sync feito' } }))
+                  } catch (e) { setVerifyResults(prev => ({ ...prev, [acc.id]: { status: 'error', message: e.message } })) }
+                  setSyncing(null)
+                }}
+                  className={`p-1.5 rounded-lg transition-colors ${syncing === acc.id ? 'text-success' : 'text-content-4 hover:text-success hover:bg-success-muted'}`}
+                  title="Sincronizar dados do canal">
+                  {syncing === acc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 </button>
                 <button onClick={() => startEdit(acc)} className="px-2 py-1.5 rounded-lg text-[11px] text-content-4 hover:text-content-2 hover:bg-surface-3 transition-colors">
                   Editar

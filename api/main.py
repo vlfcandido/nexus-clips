@@ -686,6 +686,116 @@ async def account_publish_log(account_id: int, limit: int = 20):
     }
 
 
+# ==================== ACCOUNT SYNC ====================
+
+@app.post("/api/accounts/{account_id}/sync")
+async def sync_account(account_id: int):
+    """Sincroniza dados reais do canal (followers, views, videos)."""
+    async with async_session() as session:
+        account = await session.get(PublishAccount, account_id)
+        if not account:
+            raise HTTPException(404)
+
+    if not account.access_token and not account.api_key:
+        return {"status": "error", "error": "Sem credenciais configuradas"}
+
+    import httpx
+    sync_data = {"followers": 0, "views": 0, "posts": 0, "channel_name": "", "channel_url": ""}
+
+    try:
+        if account.platform == "youtube":
+            # YouTube Data API v3 — busca stats do canal
+            api_key = account.api_key or account.access_token
+            async with httpx.AsyncClient(timeout=15) as client:
+                # Primeiro pega o channel ID do usuário autenticado
+                resp = await client.get(
+                    "https://www.googleapis.com/youtube/v3/channels",
+                    params={"part": "statistics,snippet", "mine": "true", "key": api_key},
+                    headers={"Authorization": f"Bearer {account.access_token}"} if account.access_token else {},
+                )
+
+                if resp.status_code != 200:
+                    # Tenta buscar por username
+                    resp = await client.get(
+                        "https://www.googleapis.com/youtube/v3/channels",
+                        params={"part": "statistics,snippet", "forHandle": account.username.lstrip("@"), "key": api_key},
+                    )
+
+                if resp.status_code == 200:
+                    items = resp.json().get("items", [])
+                    if items:
+                        ch = items[0]
+                        stats = ch.get("statistics", {})
+                        snippet = ch.get("snippet", {})
+                        sync_data = {
+                            "followers": int(stats.get("subscriberCount", 0)),
+                            "views": int(stats.get("viewCount", 0)),
+                            "posts": int(stats.get("videoCount", 0)),
+                            "channel_name": snippet.get("title", ""),
+                            "channel_url": f"https://youtube.com/channel/{ch['id']}",
+                            "thumbnail": snippet.get("thumbnails", {}).get("default", {}).get("url", ""),
+                        }
+                else:
+                    return {"status": "error", "error": f"YouTube API: {resp.status_code} — {resp.text[:200]}"}
+
+        elif account.platform == "telegram":
+            async with httpx.AsyncClient(timeout=10) as client:
+                # Get bot info
+                resp = await client.get(f"https://api.telegram.org/bot{account.access_token}/getMe")
+                if resp.status_code == 200 and resp.json().get("ok"):
+                    bot = resp.json()["result"]
+                    sync_data["channel_name"] = bot.get("first_name", "")
+
+                # Get chat member count (se username é um channel/group)
+                if account.username:
+                    chat_id = account.username
+                    resp2 = await client.get(
+                        f"https://api.telegram.org/bot{account.access_token}/getChatMemberCount",
+                        params={"chat_id": chat_id},
+                    )
+                    if resp2.status_code == 200 and resp2.json().get("ok"):
+                        sync_data["followers"] = resp2.json()["result"]
+
+        elif account.platform == "twitter":
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    "https://api.twitter.com/2/users/me",
+                    headers={"Authorization": f"Bearer {account.access_token}"},
+                    params={"user.fields": "public_metrics,profile_image_url"},
+                )
+                if resp.status_code == 200:
+                    user = resp.json().get("data", {})
+                    metrics = user.get("public_metrics", {})
+                    sync_data = {
+                        "followers": metrics.get("followers_count", 0),
+                        "posts": metrics.get("tweet_count", 0),
+                        "channel_name": user.get("name", ""),
+                        "channel_url": f"https://twitter.com/{user.get('username', '')}",
+                    }
+
+        elif account.platform in ("tiktok", "instagram"):
+            # Essas precisam de OAuth flow mais complexo
+            return {"status": "manual", "message": f"Sync automatico de {account.platform} requer OAuth. Atualize os dados manualmente."}
+
+    except Exception as e:
+        log.error("sync.error", platform=account.platform, error=str(e))
+        return {"status": "error", "error": str(e)}
+
+    # Salva no DB
+    async with async_session() as session:
+        acc = await session.get(PublishAccount, account_id)
+        if acc:
+            acc.total_followers = sync_data.get("followers", 0)
+            acc.total_views = sync_data.get("views", 0)
+            acc.total_posts = sync_data.get("posts", 0)
+            if sync_data.get("channel_name"):
+                acc.name = sync_data["channel_name"]
+            await session.commit()
+
+    log.info("sync.ok", platform=account.platform, followers=sync_data.get("followers"), views=sync_data.get("views"))
+    return {"status": "synced", "data": sync_data}
+
+
 # ==================== PLATFORM SPECS ====================
 
 @app.get("/api/platforms")

@@ -60,5 +60,6 @@ export const getPrompts = () => request('/prompts')
 export const updatePrompt = (id, data) => request(`/prompts/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
 export const testPrompt = (id) => request(`/prompts/${id}/test`, { method: 'POST' })
 
-// Account verification
+// Account verification & sync
 export const verifyAccount = (id) => request(`/accounts/${id}/verify`, { method: 'POST' })
+export const syncAccount = (id) => request(`/accounts/${id}/sync`, { method: 'POST' })
