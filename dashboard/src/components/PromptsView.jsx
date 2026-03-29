@@ -179,6 +179,18 @@ function PromptEditor({ prompt, onSave, onTest }) {
   )
 }
 
+// Categorias visuais pra agrupar prompts
+const PROMPT_CATEGORIES = {
+  classify: { group: 'Decisao', icon: '🎯', impact: 'Decide se a noticia vira video ou nao' },
+  strategy: { group: 'Decisao', icon: '📋', impact: 'Escolhe formato, plataforma e duracao do video' },
+  narration: { group: 'Video', icon: '🎙️', impact: 'Texto que a voz fala no video — TOM e CONTEUDO' },
+  caption_tiktok: { group: 'Publicacao', icon: '🎵', impact: 'Titulo e descricao do TikTok' },
+  caption_instagram: { group: 'Publicacao', icon: '📸', impact: 'Titulo e descricao do Instagram' },
+  caption_youtube: { group: 'Publicacao', icon: '▶️', impact: 'Titulo e descricao do YouTube' },
+  growth_hook: { group: 'Growth', icon: '🚀', impact: 'Gancho de abertura pra prender atencao' },
+  image_search: { group: 'Video', icon: '🖼️', impact: 'Que imagens aparecem no video' },
+}
+
 export default function PromptsView() {
   const [prompts, setPrompts] = useState([])
 
@@ -200,32 +212,53 @@ export default function PromptsView() {
     return await testPrompt(id)
   }
 
+  // Agrupa por categoria
+  const groups = {}
+  prompts.forEach(p => {
+    const cat = PROMPT_CATEGORIES[p.key] || { group: 'Outro', icon: '📎', impact: '' }
+    if (!groups[cat.group]) groups[cat.group] = []
+    groups[cat.group].push({ ...p, ...cat })
+  })
+
   return (
     <div className="space-y-5">
       <div className="animate-fade">
         <h1 className="text-xl font-bold text-content-1 tracking-tight">Prompts</h1>
         <p className="text-xs text-content-3 mt-1">
-          Edite as instrucoes da IA — mude o tom, estilo, regras de classificacao, etc.
-          Tudo que a IA faz e controlado por estes prompts.
+          Controle tudo que a IA faz — desde decidir se uma noticia vira video ate o que a voz fala.
         </p>
       </div>
 
-      {/* Info card */}
+      {/* Guia rápido */}
       <div className="bg-accent-muted border border-accent/20 rounded-xl p-4 animate-in" style={{ animationDelay: '50ms' }}>
-        <p className="text-xs text-accent-light">
-          <strong>Dica:</strong> Cada prompt tem variaveis entre {'{chaves}'} que sao preenchidas automaticamente.
-          Voce pode mudar o texto, tom e regras livremente. Use o botao "Testar" pra ver o resultado antes de salvar.
-        </p>
+        <p className="text-xs text-accent-light mb-2"><strong>Como funciona:</strong></p>
+        <div className="grid grid-cols-2 gap-2 text-[10px] text-content-3">
+          <div className="flex items-center gap-2"><span>🎙️</span> <strong className="text-content-1">Narracao</strong> = o que a voz fala no video</div>
+          <div className="flex items-center gap-2"><span>🖼️</span> <strong className="text-content-1">Imagens</strong> = que fotos aparecem no fundo</div>
+          <div className="flex items-center gap-2"><span>🎯</span> <strong className="text-content-1">Classificador</strong> = decide se vira video ou nao</div>
+          <div className="flex items-center gap-2"><span>🚀</span> <strong className="text-content-1">Growth</strong> = gancho pra prender atencao</div>
+        </div>
+        <p className="text-[9px] text-content-4 mt-2">Edite o texto, ajuste o tom, e clique "Testar" pra ver o resultado antes de salvar.</p>
       </div>
 
-      <div className="space-y-2 stagger">
-        {prompts.length === 0 && (
-          <EmptyState icon={MessageSquare} title="Carregando prompts..." />
-        )}
-        {prompts.map(p => (
-          <PromptEditor key={p.id} prompt={p} onSave={handleSave} onTest={handleTest} />
-        ))}
-      </div>
+      {/* Prompts agrupados por categoria */}
+      {prompts.length === 0 && <EmptyState icon={MessageSquare} title="Carregando prompts..." />}
+
+      {Object.entries(groups).map(([groupName, groupPrompts]) => (
+        <div key={groupName} className="space-y-2">
+          <h2 className="text-xs font-semibold text-content-3 uppercase tracking-wider px-1 pt-2">{groupName}</h2>
+          {groupPrompts.map(p => (
+            <div key={p.id}>
+              {/* Tag de impacto */}
+              <div className="flex items-center gap-2 mb-1 px-1">
+                <span className="text-sm">{p.icon}</span>
+                <span className="text-[10px] text-content-4">{p.impact}</span>
+              </div>
+              <PromptEditor prompt={p} onSave={handleSave} onTest={handleTest} />
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   )
 }

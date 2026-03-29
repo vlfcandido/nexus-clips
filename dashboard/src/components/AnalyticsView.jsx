@@ -167,16 +167,30 @@ export default function AnalyticsView() {
     ? ((totalLikes + totalShares) / totalViews * 100).toFixed(1)
     : '0.0'
 
-  // Mock sparklines (em prod, dados reais por dia)
-  const spark = (base, variance) => Array.from({ length: 14 }, () => ({ v: base + Math.floor(Math.random() * variance) }))
+  // Sparklines baseados em dados reais (agrupa por dia)
+  const spark = () => {
+    const days = {}
+    clips.forEach(c => {
+      const d = c.created_at?.split('T')[0] || 'unknown'
+      days[d] = (days[d] || 0) + 1
+    })
+    return Object.values(days).map(v => ({ v }))
+  }
 
-  // Views por dia (mock baseado em clips reais)
-  const dailyData = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'].map(d => ({
-    day: d,
-    views: Math.floor(Math.random() * 5000) + 1000,
-    likes: Math.floor(Math.random() * 300) + 50,
-    shares: Math.floor(Math.random() * 100) + 10,
-  }))
+  // Clips por dia da semana (dados reais)
+  const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab']
+  const dailyBuckets = {}
+  dayNames.forEach(d => { dailyBuckets[d] = { day: d, views: 0, likes: 0, shares: 0, clips: 0 } })
+  clips.forEach(c => {
+    if (!c.created_at) return
+    const dayIdx = new Date(c.created_at).getDay()
+    const d = dayNames[dayIdx]
+    dailyBuckets[d].views += c.views
+    dailyBuckets[d].likes += c.likes
+    dailyBuckets[d].shares += c.shares
+    dailyBuckets[d].clips += 1
+  })
+  const dailyData = dayNames.map(d => dailyBuckets[d])
 
   // Posts por plataforma
   const platformData = ['tiktok', 'instagram', 'youtube', 'twitter', 'telegram'].map(p => ({
@@ -198,10 +212,14 @@ export default function AnalyticsView() {
   const PIE_COLORS = ['#6366f1', '#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#a855f7']
 
   // Horários de melhor performance (mock)
-  const hourData = Array.from({ length: 24 }, (_, i) => ({
-    h: `${String(i).padStart(2, '0')}h`,
-    engagement: Math.floor(Math.random() * 500) + (i >= 18 && i <= 22 ? 400 : 50),
-  }))
+  // Clips por hora (dados reais)
+  const hourBuckets = Array.from({ length: 24 }, (_, i) => ({ h: `${String(i).padStart(2, '0')}h`, clips: 0 }))
+  clips.forEach(c => {
+    if (!c.created_at) return
+    const hour = new Date(c.created_at).getHours()
+    hourBuckets[hour].clips += 1
+  })
+  const hourData = hourBuckets
 
   return (
     <div className="space-y-6">
@@ -224,17 +242,17 @@ export default function AnalyticsView() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <MetricCard icon={Eye} label="Views totais" value={totalViews.toLocaleString('pt-BR')}
           change={12} changeLabel="vs semana anterior" color="accent"
-          sparkData={spark(200, 300)} delay={0} />
+          sparkData={spark()} delay={0} />
         <MetricCard icon={Heart} label="Likes totais" value={totalLikes.toLocaleString('pt-BR')}
-          change={8} color="danger" sparkData={spark(30, 50)} delay={60} />
+          color="danger" sparkData={spark()} delay={60} />
         <MetricCard icon={Share2} label="Compartilhamentos" value={totalShares.toLocaleString('pt-BR')}
-          change={-3} color="info" sparkData={spark(10, 20)} delay={120} />
+          color="info" sparkData={spark()} delay={120} />
         <MetricCard icon={Target} label="Engajamento" value={`${engagementRate}%`}
-          change={5} changeLabel="(likes+shares)/views" color="success"
-          sparkData={spark(3, 5)} delay={180} />
-        <MetricCard icon={Film} label="Clips publicados" value={published}
-          change={15} changeLabel={`de ${clips.length} gerados`} color="warning"
-          sparkData={spark(2, 5)} delay={240} />
+          changeLabel="(likes+shares)/views" color="success"
+          sparkData={spark()} delay={180} />
+        <MetricCard icon={Film} label="Clips gerados" value={clips.length}
+          changeLabel={`${published} publicados`} color="warning"
+          sparkData={spark()} delay={240} />
       </div>
 
       {/* Charts row */}

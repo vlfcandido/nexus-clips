@@ -330,14 +330,49 @@ async def generate_video_node(state: ContentState) -> dict:
 
     from generator.video_builder import generate_narrated_video
 
-    # Monta texto de narração combinando hook + summary
-    hook = state.get("hook_text", "")
-    summary = state.get("summary", "")
-    narration = f"{hook}. {summary}" if hook else summary
-    # Remove emojis e caracteres non-latin que Edge TTS não processa
+    # Gera texto de narração usando prompt editável do DB (Pedro controla pela tela Prompts)
+    narration = ""
+    try:
+        from config.prompts import get_prompt
+        from config.llm import llm_json
+        prompt_cfg = await get_prompt("narration")
+
+        template_vars = {
+            "title": state.get("suggested_title", ""),
+            "summary": state.get("summary", ""),
+            "topic": state.get("topic", ""),
+            "category": state.get("category", ""),
+        }
+        try:
+            user_text = prompt_cfg.user_template.format(**template_vars)
+        except (KeyError, IndexError):
+            user_text = f"Titulo: {template_vars['title']}\nResumo: {template_vars['summary']}\nTopico: {template_vars['topic']}"
+
+        result = await llm_json(
+            system=prompt_cfg.system_prompt,
+            user=user_text,
+            temperature=prompt_cfg.temperature,
+            max_tokens=prompt_cfg.max_tokens,
+        )
+        narration = result.get("narration", "")
+        hook_from_ai = result.get("hook_opening", "")
+        if hook_from_ai and narration and not narration.startswith(hook_from_ai):
+            narration = f"{hook_from_ai} {narration}"
+
+        log.info("node.generate_video.narration_ai", uid=uid, chars=len(narration))
+    except Exception as e:
+        log.warning("node.generate_video.narration_fallback", uid=uid, error=str(e))
+
+    # Fallback: hook + summary direto (se IA falhar)
+    if not narration:
+        hook = state.get("hook_text", "")
+        summary = state.get("summary", "")
+        narration = f"{hook}. {summary}" if hook else summary
+
+    # Limpa pra Edge TTS
     import re
     narration = re.sub(r'[^\w\s.,!?;:\-\'\"áàâãéèêíìîóòôõúùûçÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ]', '', narration).strip()
-    log.info("node.generate_video.narration", uid=uid, text=narration[:100])
+    log.info("node.generate_video.narration_final", uid=uid, text=narration[:120])
 
     # Escolhe voz (vozes testadas e funcionais no Edge TTS)
     voice_map = {
