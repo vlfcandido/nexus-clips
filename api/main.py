@@ -1086,6 +1086,54 @@ async def verify_account(account_id: int):
     return checks
 
 
+@app.post("/api/accounts/{account_id}/diagnose")
+async def diagnose_account_error(account_id: int):
+    """IA analisa o erro de conexão e explica pro Pedro como resolver."""
+    async with async_session() as session:
+        account = await session.get(PublishAccount, account_id)
+        if not account:
+            raise HTTPException(404)
+
+    # Primeiro faz o verify pra pegar o erro
+    verify_result = await verify_account(account_id)
+
+    if verify_result.get("status") == "connected":
+        return {"diagnosis": "Tudo certo! A conta esta conectada e funcionando.", "steps": []}
+
+    error = verify_result.get("message", "Erro desconhecido")
+    platform = account.platform
+
+    try:
+        from config.llm import llm_json
+        result = await llm_json(
+            system="Voce e um assistente tecnico que ajuda usuarios leigos a configurar APIs de redes sociais. Responda em JSON, em portugues BR, linguagem simples.",
+            user=f"""O usuario tentou conectar uma conta de {platform} no nosso sistema e deu erro.
+
+Erro: {error}
+Plataforma: {platform}
+Tem API Key: {'sim' if account.api_key else 'nao'}
+Tem Access Token: {'sim' if account.access_token else 'nao'}
+Username: {account.username or 'nao informado'}
+
+Explique de forma SIMPLES o que aconteceu e como resolver. O usuario e leigo.
+
+JSON: {{
+    "diagnosis": "explicacao simples do que deu errado (1-2 frases)",
+    "steps": ["passo 1 pra resolver", "passo 2", "passo 3"],
+    "tip": "dica extra se tiver"
+}}""",
+            temperature=0.3,
+            max_tokens=300,
+        )
+        return result
+    except Exception as e:
+        return {
+            "diagnosis": f"Erro na conexao: {error}",
+            "steps": verify_result.get("permissions", []),
+            "tip": "Se o problema persistir, verifique se a API esta ativada no painel da plataforma.",
+        }
+
+
 def _get_platform_auth_guide(platform: str) -> list[str]:
     """Retorna guia de autenticação por plataforma."""
     guides = {

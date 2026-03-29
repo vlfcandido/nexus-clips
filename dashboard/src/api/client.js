@@ -63,3 +63,4 @@ export const testPrompt = (id) => request(`/prompts/${id}/test`, { method: 'POST
 // Account verification & sync
 export const verifyAccount = (id) => request(`/accounts/${id}/verify`, { method: 'POST' })
 export const syncAccount = (id) => request(`/accounts/${id}/sync`, { method: 'POST' })
+export const diagnoseAccount = (id) => request(`/accounts/${id}/diagnose`, { method: 'POST' })

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Users, Plus, Trash2, X, ToggleLeft, ToggleRight, Eye, Film, ExternalLink, Shield, Check, Wifi, Loader2, RefreshCw } from 'lucide-react'
-import { getAccounts, createAccount, updateAccount, deleteAccount, verifyAccount, syncAccount } from '../api/client'
+import { Users, Plus, Trash2, X, ToggleLeft, ToggleRight, Eye, Film, ExternalLink, Shield, Check, Wifi, Loader2, RefreshCw, HelpCircle, Sparkles } from 'lucide-react'
+import { getAccounts, createAccount, updateAccount, deleteAccount, verifyAccount, syncAccount, diagnoseAccount } from '../api/client'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
 import Card, { CardHeader } from './ui/Card'
@@ -37,7 +37,9 @@ export default function AccountsView() {
   const [editingId, setEditingId] = useState(null)
   const [verifying, setVerifying] = useState(null)
   const [syncing, setSyncing] = useState(null)
+  const [diagnosing, setDiagnosing] = useState(null)
   const [verifyResults, setVerifyResults] = useState({})
+  const [diagnoseResults, setDiagnoseResults] = useState({})
   const [form, setForm] = useState({
     name: '', platform: 'tiktok', username: '', topics: [],
     auto_publish: false, max_posts_per_day: 5,
@@ -403,16 +405,68 @@ export default function AccountsView() {
             </div>
 
             {verifyResults[acc.id] && (
-              <div className={`mt-3 px-3 py-2 rounded-lg text-[10px] ${
-                verifyResults[acc.id].status === 'connected' ? 'bg-success-muted text-success' :
-                verifyResults[acc.id].status === 'manual' ? 'bg-warning-muted text-warning' :
-                'bg-danger-muted text-danger'
+              <div className={`mt-3 px-3 py-3 rounded-xl text-[11px] ${
+                verifyResults[acc.id].status === 'connected' ? 'bg-success-muted border border-success/20' :
+                verifyResults[acc.id].status === 'manual' ? 'bg-warning-muted border border-warning/20' :
+                'bg-danger-muted border border-danger/20'
               }`}>
-                <p className="font-medium">{verifyResults[acc.id].message}</p>
+                <p className={`font-semibold ${
+                  verifyResults[acc.id].status === 'connected' ? 'text-success' :
+                  verifyResults[acc.id].status === 'manual' ? 'text-warning' : 'text-danger'
+                }`}>
+                  {verifyResults[acc.id].status === 'connected' ? '✅ ' : verifyResults[acc.id].status === 'manual' ? '⚠️ ' : '❌ '}
+                  {verifyResults[acc.id].message}
+                </p>
                 {verifyResults[acc.id].permissions?.length > 0 && (
-                  <ul className="mt-1 space-y-0.5 text-content-3">
-                    {verifyResults[acc.id].permissions.map((p, i) => <li key={i}>{p}</li>)}
+                  <ul className="mt-2 space-y-1 text-content-3">
+                    {verifyResults[acc.id].permissions.map((p, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-content-4 mt-0.5">→</span>
+                        <span>{p}</span>
+                      </li>
+                    ))}
                   </ul>
+                )}
+
+                {/* Botão "IA ajuda" quando deu erro */}
+                {verifyResults[acc.id].status === 'error' && (
+                  <button
+                    onClick={async () => {
+                      setDiagnosing(acc.id)
+                      try {
+                        const r = await diagnoseAccount(acc.id)
+                        setDiagnoseResults(prev => ({ ...prev, [acc.id]: r }))
+                      } catch {}
+                      setDiagnosing(null)
+                    }}
+                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-accent-muted rounded-lg text-accent-light text-[10px] font-medium hover:bg-accent/20 transition-colors"
+                  >
+                    {diagnosing === acc.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                    {diagnosing === acc.id ? 'Analisando...' : 'IA: me ajuda a resolver'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Diagnóstico da IA */}
+            {diagnoseResults[acc.id] && (
+              <div className="mt-2 p-3 bg-accent-muted/50 border border-accent/20 rounded-xl text-[11px]">
+                <p className="font-semibold text-accent-light mb-2 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" /> Diagnostico da IA
+                </p>
+                <p className="text-content-2 mb-2">{diagnoseResults[acc.id].diagnosis}</p>
+                {diagnoseResults[acc.id].steps?.length > 0 && (
+                  <ol className="space-y-1.5 text-content-3">
+                    {diagnoseResults[acc.id].steps.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="w-4 h-4 rounded-full bg-accent/20 flex items-center justify-center text-[9px] font-bold text-accent-light flex-shrink-0 mt-0.5">{i+1}</span>
+                        <span>{s}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {diagnoseResults[acc.id].tip && (
+                  <p className="mt-2 text-content-4 italic">💡 {diagnoseResults[acc.id].tip}</p>
                 )}
               </div>
             )}
