@@ -1,9 +1,8 @@
 """Geração de captions virais e títulos otimizados com Claude."""
 
-import anthropic
 import structlog
 
-from config.settings import settings
+from config.llm import llm_json
 
 log = structlog.get_logger()
 
@@ -26,8 +25,6 @@ async def generate_caption(
     }
     """
     try:
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-
         platform_hints = {
             "tiktok": "Máximo 150 chars no título. Hashtags relevantes (5-8). Tom informal, BR, gírias ok. Gancho forte nos primeiros 2 segundos.",
             "instagram": "Caption mais longa ok (até 2200 chars). 20-30 hashtags. Mix de populares + nichados. CTA pro engajamento.",
@@ -35,13 +32,9 @@ async def generate_caption(
             "twitter": "Máximo 280 chars total. 2-3 hashtags máx. Direto ao ponto. Controverso = mais RT.",
         }
 
-        response = await client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=500,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""Gere uma caption viral pra esta postagem:
+        result = await llm_json(
+            system="Você é um copywriter viral brasileiro. Responda APENAS em JSON.",
+            user=f"""Gere uma caption viral pra esta postagem:
 
 Conteúdo: {summary}
 Categoria: {category}
@@ -66,16 +59,8 @@ REGRAS:
 - Polêmico mas sem fake news
 - Emojis com moderação
 - Hashtags relevantes pro nicho""",
-                }
-            ],
+            max_tokens=500,
         )
-
-        import json
-        raw = response.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-
-        result = json.loads(raw)
         log.info("caption.generated", platform=platform, title=result.get("title", "")[:50])
         return result
 

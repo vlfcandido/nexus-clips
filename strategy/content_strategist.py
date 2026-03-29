@@ -12,10 +12,9 @@ Este é o cérebro do sistema. Pra cada conteúdo detectado, decide:
 
 from dataclasses import dataclass
 
-import anthropic
 import structlog
 
-from config.settings import settings
+from config.llm import llm_json
 from detection.classifier import MomentClassification
 
 log = structlog.get_logger()
@@ -82,19 +81,12 @@ async def decide_strategy(
 ) -> ContentStrategy:
     """Usa Claude pra decidir a melhor estratégia pra este conteúdo."""
     try:
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-
-        response = await client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=800,
+        data = await llm_json(
             system="""Você é um estrategista de conteúdo viral brasileiro.
 Sua missão é maximizar views e receita pra cada conteúdo.
 Considere: horário, formato, plataforma, voz, anti-strike, monetização.
 Seja prático e direto. Responda APENAS em JSON.""",
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""Analise este conteúdo e defina a estratégia:
+            user=f"""Analise este conteúdo e defina a estratégia:
 
 Classificação:
 - Categoria: {classification.category}
@@ -134,15 +126,8 @@ Responda em JSON:
     "confidence": 0.0-1.0,
     "reasoning": "explicação curta da estratégia"
 }}""",
-                }
-            ],
+            max_tokens=800,
         )
-
-        import json
-        raw = response.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-        data = json.loads(raw)
 
         strategy = ContentStrategy(
             format_type=data.get("format_type", "clip"),

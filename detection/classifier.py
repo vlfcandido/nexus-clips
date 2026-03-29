@@ -9,10 +9,9 @@ Analisa o conteúdo (transcrição + visão) e decide:
 
 from dataclasses import dataclass
 
-import anthropic
 import structlog
 
-from config.settings import settings
+from config.llm import llm_json
 from detection.google_vision import VisionResult
 from detection.whisper_transcriber import TranscriptionResult
 
@@ -39,8 +38,6 @@ async def classify_moment(
 ) -> MomentClassification:
     """Usa Claude pra classificar se o conteúdo vale um corte."""
     try:
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-
         context_parts = [f"Texto/título: {text}"]
         if transcription:
             context_parts.append(f"Transcrição do áudio: {transcription.full_text[:2000]}")
@@ -52,13 +49,9 @@ async def classify_moment(
 
         context = "\n".join(context_parts)
 
-        response = await client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=500,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""Analise este conteúdo de mídia brasileira e classifique:
+        data = await llm_json(
+            system="Você é um classificador de conteúdo de mídia brasileira. Responda APENAS em JSON.",
+            user=f"""Analise este conteúdo de mídia brasileira e classifique:
 
 {context}
 
@@ -76,18 +69,8 @@ Responda APENAS neste formato JSON (sem markdown):
 
 Critérios de viralidade alta (7+): gol importante, polêmica explosiva, fala viral, treta entre figuras públicas.
 Critérios de urgência high: eventos ao vivo, breaking news, gol em jogo grande.""",
-                }
-            ],
+            max_tokens=500,
         )
-
-        import json
-
-        raw = response.content[0].text.strip()
-        # Remove possíveis backticks
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-
-        data = json.loads(raw)
 
         result = MomentClassification(
             is_relevant=data.get("is_relevant", False),

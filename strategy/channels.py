@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 
 import structlog
 
+from config.llm import llm_json
+
 log = structlog.get_logger()
 
 
@@ -154,25 +156,16 @@ async def adapt_content_for_channel(
 
     Ex: mesma notícia política, mas com tom diferente pra direita vs esquerda.
     """
-    import anthropic
-    from config.settings import settings
-
     try:
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-
         bias_instructions = {
             "direita": "Tom conservador/liberal. Valorize liberdade individual, economia de mercado, segurança, valores tradicionais. Critique excesso de estado, burocracia, impostos.",
             "esquerda": "Tom progressista/popular. Valorize justiça social, direitos trabalhistas, igualdade, serviços públicos. Critique desigualdade, privilégios, concentração de renda.",
             "neutro": "Tom informativo e equilibrado. Apresente os fatos sem viés claro.",
         }
 
-        response = await client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=400,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""Adapte este conteúdo pro canal "{channel.name}".
+        data = await llm_json(
+            system="Você é um editor de conteúdo que adapta posts pra diferentes canais e públicos. Responda APENAS em JSON.",
+            user=f"""Adapte este conteúdo pro canal "{channel.name}".
 
 Conteúdo original: {content_summary}
 Caption original: {original_caption}
@@ -195,15 +188,8 @@ REGRAS:
 - NUNCA invente fatos ou fake news
 - Pode ter opinião forte, mas baseada no fato real
 - Gere engajamento: polêmica controlada""",
-                }
-            ],
+            max_tokens=400,
         )
-
-        import json
-        raw = response.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-        data = json.loads(raw)
 
         log.info(
             "channels.content_adapted",

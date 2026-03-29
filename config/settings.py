@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     # --- Anthropic ---
     anthropic_api_key: str = ""
 
+    # --- Groq (LLM grátis) ---
+    groq_api_key: str = ""
+    ai_model: str = "llama-3.3-70b-versatile"
+
     # --- Twitter/X ---
     twitter_bearer_token: str = ""
     twitter_api_key: str = ""

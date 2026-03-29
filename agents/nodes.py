@@ -11,7 +11,6 @@ import time
 import uuid
 
 import structlog
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
 
@@ -24,19 +23,34 @@ log = structlog.get_logger()
 # ==================== LLM SETUP ====================
 
 def get_llm(temperature: float = 0.3):
-    """Retorna instância do Claude via LangChain.
+    """Retorna LLM via LangChain — usa Groq (grátis) ou Claude (pago).
 
     CONCEITO LANGCHAIN:
-    - ChatAnthropic é o wrapper do LangChain pro Claude
-    - Funciona como qualquer LLM no ecossistema LangChain
-    - Suporta .invoke(), .ainvoke(), .stream(), .astream()
+    - ChatGroq e ChatAnthropic implementam a mesma interface
+    - Trocar de provider é só mudar o wrapper — o resto do código não muda
+    - Isso é o poder da abstração do LangChain: vendor-agnostic
     """
-    return ChatAnthropic(
-        model="claude-sonnet-4-6",
-        anthropic_api_key=settings.anthropic_api_key,
-        temperature=temperature,
-        max_tokens=600,
-    )
+    if settings.groq_api_key:
+        from langchain_groq import ChatGroq
+        log.debug("llm.provider", provider="groq", model=settings.ai_model)
+        return ChatGroq(
+            model=settings.ai_model,
+            api_key=settings.groq_api_key,
+            temperature=temperature,
+            max_tokens=600,
+        )
+
+    if settings.anthropic_api_key:
+        from langchain_anthropic import ChatAnthropic
+        log.debug("llm.provider", provider="anthropic")
+        return ChatAnthropic(
+            model="claude-sonnet-4-6",
+            anthropic_api_key=settings.anthropic_api_key,
+            temperature=temperature,
+            max_tokens=600,
+        )
+
+    raise RuntimeError("Nenhuma API key configurada (GROQ_API_KEY ou ANTHROPIC_API_KEY)")
 
 
 # ==================== NÓ: CLASSIFY ====================

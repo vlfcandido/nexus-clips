@@ -12,10 +12,9 @@ Canais novos precisam de táticas específicas pra ganhar tração:
 
 from dataclasses import dataclass
 
-import anthropic
 import structlog
 
-from config.settings import settings
+from config.llm import llm_json
 
 log = structlog.get_logger()
 
@@ -111,19 +110,12 @@ async def generate_growth_plan(
 ) -> GrowthPlan:
     """Gera plano de crescimento específico pra este conteúdo."""
     try:
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-
         phase = GROWTH_PHASES.get(current_phase, GROWTH_PHASES["zero"])
         series = SERIES_TEMPLATES.get(topic, [])
 
-        response = await client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=600,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""Você é um growth hacker de redes sociais brasileiro.
-Canal NOVO (fase: {current_phase}, {phase['followers']} seguidores).
+        data = await llm_json(
+            system="Você é um growth hacker de redes sociais brasileiro. Responda APENAS em JSON.",
+            user=f"""Canal NOVO (fase: {current_phase}, {phase['followers']} seguidores).
 Estratégia da fase: {phase['strategy']}
 
 Conteúdo: {content_summary}
@@ -155,15 +147,8 @@ REGRAS:
 - CTAs que pedem follow/like/comentário
 - Perguntas que dividem opinião (gera comentários = algoritmo empurra)
 - Hashtags: 3 trending + 3 nicho + 1 branded""",
-                }
-            ],
+            max_tokens=600,
         )
-
-        import json
-        raw = response.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-        data = json.loads(raw)
 
         plan = GrowthPlan(
             posts_per_day=phase["posts_per_day"],
