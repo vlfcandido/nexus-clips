@@ -5,6 +5,8 @@ import ClipsView from './components/ClipsView'
 import SourcesView from './components/SourcesView'
 import TrendingView from './components/TrendingView'
 import AccountsView from './components/AccountsView'
+import AnalyticsView from './components/AnalyticsView'
+import PromptsView from './components/PromptsView'
 import SettingsView from './components/SettingsView'
 
 const PAGES = {
@@ -13,6 +15,8 @@ const PAGES = {
   sources: SourcesView,
   trending: TrendingView,
   accounts: AccountsView,
+  analytics: AnalyticsView,
+  prompts: PromptsView,
   settings: SettingsView,
 }
 

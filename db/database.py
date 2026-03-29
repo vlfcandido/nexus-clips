@@ -17,6 +17,18 @@ class Base(DeclarativeBase):
 
 async def init_db():
     # Importa models pra registrar as tabelas no Base.metadata
-    import db.models  # noqa: F401
+    from db.models import DEFAULT_PROMPTS, PromptTemplate
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Seed prompts padrão (só insere se não existir)
+    from sqlalchemy import select
+    async with async_session() as session:
+        existing = await session.execute(select(PromptTemplate.key))
+        existing_keys = {r[0] for r in existing.all()}
+
+        for p in DEFAULT_PROMPTS:
+            if p["key"] not in existing_keys:
+                session.add(PromptTemplate(**p))
+
+        await session.commit()

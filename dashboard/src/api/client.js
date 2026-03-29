@@ -52,3 +52,11 @@ export const getAccountLog = (id) => request(`/accounts/${id}/log`)
 // Platforms
 export const getPlatforms = () => request('/platforms')
 export const getClipCompatibility = (id) => request(`/clips/${id}/compatibility`)
+
+// Prompts
+export const getPrompts = () => request('/prompts')
+export const updatePrompt = (id, data) => request(`/prompts/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+export const testPrompt = (id) => request(`/prompts/${id}/test`, { method: 'POST' })
+
+// Account verification
+export const verifyAccount = (id) => request(`/accounts/${id}/verify`, { method: 'POST' })

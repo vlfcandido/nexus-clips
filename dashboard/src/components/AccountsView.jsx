@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Users, Plus, Trash2, X, ToggleLeft, ToggleRight, Eye, Film, ExternalLink, Shield, Check } from 'lucide-react'
-import { getAccounts, createAccount, updateAccount, deleteAccount } from '../api/client'
+import { Users, Plus, Trash2, X, ToggleLeft, ToggleRight, Eye, Film, ExternalLink, Shield, Check, Wifi, WifiOff, Loader2 } from 'lucide-react'
+import { getAccounts, createAccount, updateAccount, deleteAccount, verifyAccount } from '../api/client'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
 import Card, { CardHeader } from './ui/Card'
@@ -35,6 +35,8 @@ export default function AccountsView() {
   const [accounts, setAccounts] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [verifying, setVerifying] = useState(null) // account id being verified
+  const [verifyResults, setVerifyResults] = useState({}) // {accountId: result}
   const [form, setForm] = useState({
     name: '', platform: 'tiktok', username: '', topics: [],
     auto_publish: false, max_posts_per_day: 5,
@@ -234,8 +236,38 @@ export default function AccountsView() {
                 </div>
               </div>
 
+              {/* Verify result */}
+              {verifyResults[acc.id] && (
+                <div className={`mt-2 px-3 py-2 rounded-lg text-[10px] ${
+                  verifyResults[acc.id].status === 'connected' ? 'bg-success-muted text-success' :
+                  verifyResults[acc.id].status === 'manual' ? 'bg-warning-muted text-warning' :
+                  'bg-danger-muted text-danger'
+                }`}>
+                  <p className="font-medium">{verifyResults[acc.id].message}</p>
+                  {verifyResults[acc.id].permissions?.length > 0 && (
+                    <ul className="mt-1 space-y-0.5 text-content-3">
+                      {verifyResults[acc.id].permissions.map((p, i) => <li key={i}>{p}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+              </div>
+
               {/* Actions */}
               <div className="flex items-center gap-1 flex-shrink-0">
+                <button onClick={async () => {
+                  setVerifying(acc.id)
+                  try {
+                    const result = await verifyAccount(acc.id)
+                    setVerifyResults(prev => ({ ...prev, [acc.id]: result }))
+                  } catch (e) { setVerifyResults(prev => ({ ...prev, [acc.id]: { status: 'error', message: e.message } })) }
+                  setVerifying(null)
+                }}
+                  className={`px-2 py-1.5 rounded-lg text-[11px] transition-colors ${
+                    verifying === acc.id ? 'text-accent-light' : 'text-content-4 hover:text-accent-light hover:bg-accent-muted'
+                  }`}>
+                  {verifying === acc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
+                </button>
                 <button onClick={() => startEdit(acc)}
                   className="px-2 py-1.5 rounded-lg text-[11px] text-content-4 hover:text-content-2 hover:bg-surface-3 transition-colors">
                   Editar

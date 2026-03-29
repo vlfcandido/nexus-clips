@@ -15,7 +15,7 @@ from sqlalchemy import desc, func, select, update
 from config.logging import setup_logging
 from config.settings import settings
 from db.database import async_session, init_db
-from db.models import Clip, MonitoredSource, PublishAccount, PublishLog
+from db.models import Clip, MonitoredSource, PublishAccount, PublishLog, PromptTemplate
 from detection.trending import get_all_trends
 from pipeline import Pipeline
 from strategy.scheduler import get_analytics_summary
@@ -577,3 +577,201 @@ async def clip_compatibility(clip_id: int):
         )
 
     return {"clip_id": clip_id, "compatibility": results}
+
+
+# ==================== PROMPTS ====================
+
+@app.get("/api/prompts")
+async def list_prompts():
+    """Lista todos os prompts editáveis."""
+    async with async_session() as session:
+        result = await session.execute(select(PromptTemplate).order_by(PromptTemplate.key))
+        prompts = result.scalars().all()
+
+    return {
+        "prompts": [
+            {
+                "id": p.id,
+                "key": p.key,
+                "name": p.name,
+                "description": p.description,
+                "system_prompt": p.system_prompt,
+                "user_prompt_template": p.user_prompt_template,
+                "temperature": p.temperature,
+                "max_tokens": p.max_tokens,
+                "active": p.active,
+                "updated_at": p.updated_at.isoformat() if p.updated_at else "",
+            }
+            for p in prompts
+        ]
+    }
+
+
+class PromptUpdate(BaseModel):
+    system_prompt: str | None = None
+    user_prompt_template: str | None = None
+    temperature: float | None = None
+    max_tokens: int | None = None
+    active: bool | None = None
+
+
+@app.patch("/api/prompts/{prompt_id}")
+async def update_prompt(prompt_id: int, data: PromptUpdate):
+    """Atualiza um prompt."""
+    async with async_session() as session:
+        prompt = await session.get(PromptTemplate, prompt_id)
+        if not prompt:
+            raise HTTPException(404, "Prompt nao encontrado")
+
+        if data.system_prompt is not None: prompt.system_prompt = data.system_prompt
+        if data.user_prompt_template is not None: prompt.user_prompt_template = data.user_prompt_template
+        if data.temperature is not None: prompt.temperature = data.temperature
+        if data.max_tokens is not None: prompt.max_tokens = data.max_tokens
+        if data.active is not None: prompt.active = data.active
+
+        await session.commit()
+        log.info("api.prompts.update", id=prompt_id, key=prompt.key)
+
+    return {"status": "updated"}
+
+
+@app.post("/api/prompts/{prompt_id}/test")
+async def test_prompt(prompt_id: int):
+    """Testa um prompt com conteúdo de exemplo."""
+    async with async_session() as session:
+        prompt = await session.get(PromptTemplate, prompt_id)
+        if not prompt:
+            raise HTTPException(404)
+
+    from config.llm import llm_json
+
+    test_vars = {
+        "context": "Noticia: Selecao Brasileira convoca Endrick para Copa 2026.",
+        "category": "futebol", "topic": "futebol", "virality_score": "7",
+        "urgency": "medium", "summary": "Endrick convocado pra Copa 2026",
+        "has_video": "false", "source_type": "rss", "title": "Endrick na Copa",
+        "platform": "tiktok",
+    }
+
+    try:
+        user_text = prompt.user_prompt_template.format(**test_vars)
+    except KeyError:
+        user_text = prompt.user_prompt_template
+
+    try:
+        result = await llm_json(
+            system=prompt.system_prompt,
+            user=user_text,
+            temperature=prompt.temperature,
+            max_tokens=prompt.max_tokens,
+        )
+        return {"status": "ok", "result": result}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+# ==================== ACCOUNT VERIFICATION ====================
+
+@app.post("/api/accounts/{account_id}/verify")
+async def verify_account(account_id: int):
+    """Verifica se uma conta está conectada e tem permissões corretas."""
+    async with async_session() as session:
+        account = await session.get(PublishAccount, account_id)
+        if not account:
+            raise HTTPException(404)
+
+    checks = {
+        "has_credentials": bool(account.access_token or account.api_key),
+        "platform": account.platform,
+        "permissions": [],
+        "status": "not_connected",
+        "message": "",
+    }
+
+    if not checks["has_credentials"]:
+        checks["message"] = f"Sem credenciais. Adicione API key ou Access Token pra {account.platform}."
+        checks["permissions"] = _get_platform_auth_guide(account.platform)
+        return checks
+
+    # Testa conexão com a plataforma
+    import httpx
+    try:
+        if account.platform == "telegram":
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(f"https://api.telegram.org/bot{account.access_token}/getMe")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("ok"):
+                        bot = data["result"]
+                        checks["status"] = "connected"
+                        checks["message"] = f"Conectado como @{bot.get('username', '?')}"
+                        checks["permissions"] = ["send_message", "send_video", "send_photo"]
+                    else:
+                        checks["status"] = "error"
+                        checks["message"] = "Token invalido"
+                else:
+                    checks["status"] = "error"
+                    checks["message"] = f"Erro HTTP {resp.status_code}"
+
+        elif account.platform == "twitter":
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    "https://api.twitter.com/2/users/me",
+                    headers={"Authorization": f"Bearer {account.access_token}"},
+                )
+                if resp.status_code == 200:
+                    checks["status"] = "connected"
+                    checks["message"] = "Conectado ao Twitter/X"
+                    checks["permissions"] = ["tweet", "upload_media"]
+                else:
+                    checks["status"] = "error"
+                    checks["message"] = f"Erro: {resp.status_code}"
+
+        elif account.platform in ("tiktok", "instagram", "youtube"):
+            # Essas plataformas precisam de OAuth flow
+            checks["status"] = "manual"
+            checks["message"] = f"Verificacao manual necessaria pra {account.platform}. Credenciais salvas."
+            checks["permissions"] = _get_platform_auth_guide(account.platform)
+
+    except Exception as e:
+        checks["status"] = "error"
+        checks["message"] = f"Erro de conexao: {str(e)}"
+
+    log.info("api.accounts.verify", id=account_id, platform=account.platform, status=checks["status"])
+    return checks
+
+
+def _get_platform_auth_guide(platform: str) -> list[str]:
+    """Retorna guia de autenticação por plataforma."""
+    guides = {
+        "tiktok": [
+            "1. Crie app em developers.tiktok.com",
+            "2. Solicite Content Posting API",
+            "3. Copie o Client Key e Client Secret",
+            "4. Cole na tela de Contas (API Key + API Secret)",
+        ],
+        "instagram": [
+            "1. Crie app em developers.facebook.com",
+            "2. Adicione Instagram Graph API",
+            "3. Gere um Page Access Token",
+            "4. Cole na tela de Contas (Access Token)",
+        ],
+        "youtube": [
+            "1. Acesse console.cloud.google.com",
+            "2. Ative YouTube Data API v3",
+            "3. Crie credenciais OAuth 2.0",
+            "4. Cole na tela de Contas (API Key + Access Token)",
+        ],
+        "twitter": [
+            "1. Crie app em developer.twitter.com",
+            "2. Gere Bearer Token",
+            "3. Cole na tela de Contas (Access Token)",
+        ],
+        "telegram": [
+            "1. Abra @BotFather no Telegram",
+            "2. Crie bot com /newbot",
+            "3. Copie o token do bot",
+            "4. Cole na tela de Contas (Access Token)",
+        ],
+    }
+    return guides.get(platform, ["Consulte documentacao da plataforma"])
