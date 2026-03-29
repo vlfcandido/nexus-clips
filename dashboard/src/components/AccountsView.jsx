@@ -154,66 +154,153 @@ export default function AccountsView() {
             </div>
           </div>
 
-          {/* Guia de conexão por plataforma */}
-          <div className="mb-4 p-3 bg-accent-muted/50 border border-accent/10 rounded-lg">
-            <p className="text-[11px] font-semibold text-accent-light mb-2">Como conectar {form.platform}:</p>
-            {form.platform === 'telegram' && (
-              <ol className="text-[10px] text-content-3 space-y-1 list-decimal ml-4">
-                <li>Abra o Telegram e busque <strong>@BotFather</strong></li>
-                <li>Envie <code className="bg-surface-4 px-1 rounded">/newbot</code> e siga as instrucoes</li>
-                <li>Copie o <strong>token do bot</strong> que ele gerar</li>
-                <li>Cole no campo <strong>Access Token</strong> abaixo</li>
-                <li>Crie um canal/grupo e adicione o bot como admin</li>
-              </ol>
-            )}
-            {form.platform === 'tiktok' && (
-              <ol className="text-[10px] text-content-3 space-y-1 list-decimal ml-4">
-                <li>Acesse <strong>developers.tiktok.com</strong></li>
-                <li>Crie um app e solicite <strong>Content Posting API</strong></li>
-                <li>Copie <strong>Client Key</strong> → cole em API Key</li>
-                <li>Copie <strong>Client Secret</strong> → cole em Access Token</li>
-                <li>Aguarde aprovacao do TikTok (pode levar dias)</li>
-              </ol>
-            )}
-            {form.platform === 'instagram' && (
-              <ol className="text-[10px] text-content-3 space-y-1 list-decimal ml-4">
-                <li>Acesse <strong>developers.facebook.com</strong></li>
-                <li>Crie app → adicione <strong>Instagram Graph API</strong></li>
-                <li>Conecte sua conta Instagram Business</li>
-                <li>Gere um <strong>Page Access Token</strong> (longo prazo)</li>
-                <li>Cole no campo <strong>Access Token</strong> abaixo</li>
-              </ol>
-            )}
-            {form.platform === 'youtube' && (
-              <ol className="text-[10px] text-content-3 space-y-1 list-decimal ml-4">
-                <li>Acesse <strong>console.cloud.google.com</strong></li>
-                <li>Crie projeto → ative <strong>YouTube Data API v3</strong></li>
-                <li>Crie credenciais <strong>OAuth 2.0</strong></li>
-                <li>Cole API Key e Access Token nos campos abaixo</li>
-              </ol>
-            )}
-            {form.platform === 'twitter' && (
-              <ol className="text-[10px] text-content-3 space-y-1 list-decimal ml-4">
-                <li>Acesse <strong>developer.twitter.com</strong></li>
-                <li>Crie um app (Free tier funciona)</li>
-                <li>Gere <strong>Bearer Token</strong></li>
-                <li>Cole no campo <strong>Access Token</strong> abaixo</li>
-              </ol>
-            )}
-          </div>
-
-          {/* Credenciais */}
-          <div className="mb-4">
-            <p className="text-[11px] font-medium text-content-3 mb-2 flex items-center gap-1">
-              <Shield className="w-3 h-3" /> Credenciais
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Input label="API Key" placeholder="Client Key / API Key" type="password" value={form.api_key}
+          {/* ===== YOUTUBE ===== */}
+          {form.platform === 'youtube' && (
+            <div className="mb-4 space-y-3">
+              <div className="p-4 bg-danger-muted/30 border border-danger/10 rounded-xl">
+                <p className="text-xs font-semibold text-danger mb-3 flex items-center gap-1.5">▶️ Conectar YouTube</p>
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-surface-4 flex items-center justify-center text-[10px] font-bold text-content-2 flex-shrink-0 mt-0.5">1</div>
+                    <div>
+                      <p className="text-[11px] text-content-1 font-medium">Acesse o Google Cloud Console</p>
+                      <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="text-[10px] text-accent-light hover:underline">console.cloud.google.com/apis/credentials ↗</a>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-surface-4 flex items-center justify-center text-[10px] font-bold text-content-2 flex-shrink-0 mt-0.5">2</div>
+                    <div>
+                      <p className="text-[11px] text-content-1 font-medium">Ative a YouTube Data API v3</p>
+                      <p className="text-[10px] text-content-4">Biblioteca → busque "YouTube Data API v3" → Ativar</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-surface-4 flex items-center justify-center text-[10px] font-bold text-content-2 flex-shrink-0 mt-0.5">3</div>
+                    <div>
+                      <p className="text-[11px] text-content-1 font-medium">Crie uma API Key</p>
+                      <p className="text-[10px] text-content-4">Credenciais → Criar credenciais → Chave de API</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5">4</div>
+                    <div>
+                      <p className="text-[11px] text-content-1 font-medium">Cole a API Key abaixo</p>
+                      <p className="text-[10px] text-content-4">Eh so esse campo — nao precisa de mais nada pra sincronizar</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <Input label="API Key do YouTube" placeholder="AIzaSy... (começa com AIza)" value={form.api_key}
                 onChange={e => setForm({ ...form, api_key: e.target.value })} />
-              <Input label="Access Token" placeholder="Token / Secret" type="password" value={form.access_token}
+              <p className="text-[9px] text-content-4">Essa key permite sincronizar dados do canal (inscritos, views, videos). Para upload automatico de videos, sera necessario OAuth2 (etapa futura).</p>
+            </div>
+          )}
+
+          {/* ===== TELEGRAM ===== */}
+          {form.platform === 'telegram' && (
+            <div className="mb-4 space-y-3">
+              <div className="p-4 bg-info-muted/30 border border-info/10 rounded-xl">
+                <p className="text-xs font-semibold text-info mb-3 flex items-center gap-1.5">✈️ Conectar Telegram</p>
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-surface-4 flex items-center justify-center text-[10px] font-bold text-content-2 flex-shrink-0 mt-0.5">1</div>
+                    <div>
+                      <p className="text-[11px] text-content-1 font-medium">Abra o Telegram e busque @BotFather</p>
+                      <a href="https://t.me/BotFather" target="_blank" className="text-[10px] text-accent-light hover:underline">t.me/BotFather ↗</a>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-surface-4 flex items-center justify-center text-[10px] font-bold text-content-2 flex-shrink-0 mt-0.5">2</div>
+                    <div>
+                      <p className="text-[11px] text-content-1 font-medium">Envie /newbot e siga as instrucoes</p>
+                      <p className="text-[10px] text-content-4">Escolha nome e username pro bot</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-surface-4 flex items-center justify-center text-[10px] font-bold text-content-2 flex-shrink-0 mt-0.5">3</div>
+                    <div>
+                      <p className="text-[11px] text-content-1 font-medium">Copie o token que o BotFather gerar</p>
+                      <p className="text-[10px] text-content-4">Formato: 123456789:ABCdef... </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5">4</div>
+                    <div>
+                      <p className="text-[11px] text-content-1 font-medium">Cole o token abaixo</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <Input label="Bot Token" placeholder="123456789:ABCdefGHI..." value={form.access_token}
+                onChange={e => setForm({ ...form, access_token: e.target.value })} />
+              <Input label="Chat ID do canal/grupo" placeholder="@nomedocanal ou -100123456" value={form.username}
+                onChange={e => setForm({ ...form, username: e.target.value })} hint="Crie um canal, adicione o bot como admin, e coloque o @username do canal aqui" />
+            </div>
+          )}
+
+          {/* ===== TIKTOK ===== */}
+          {form.platform === 'tiktok' && (
+            <div className="mb-4 space-y-3">
+              <div className="p-4 bg-accent-muted/30 border border-accent/10 rounded-xl">
+                <p className="text-xs font-semibold text-accent-light mb-3 flex items-center gap-1.5">🎵 Conectar TikTok</p>
+                <div className="space-y-2 text-[10px] text-content-3">
+                  <p>O TikTok requer aprovacao do app pra upload automatico.</p>
+                  <p><strong>Por enquanto:</strong> gere os videos aqui e baixe pra postar manualmente no TikTok.</p>
+                  <p><strong>Futuro:</strong> vamos integrar com a Content Posting API quando aprovado.</p>
+                </div>
+              </div>
+              <Input label="Username do TikTok" placeholder="@seucanal" value={form.username}
+                onChange={e => setForm({ ...form, username: e.target.value })} hint="So pra referencia — upload automatico ainda nao disponivel" />
+            </div>
+          )}
+
+          {/* ===== INSTAGRAM ===== */}
+          {form.platform === 'instagram' && (
+            <div className="mb-4 space-y-3">
+              <div className="p-4 bg-danger-muted/30 border border-danger/10 rounded-xl">
+                <p className="text-xs font-semibold text-danger mb-3 flex items-center gap-1.5">📸 Conectar Instagram</p>
+                <div className="space-y-2 text-[10px] text-content-3">
+                  <p>Instagram Reels requer uma <strong>conta Business</strong> + app no Facebook Developers.</p>
+                  <p><strong>Por enquanto:</strong> gere os videos aqui e baixe pra postar manualmente.</p>
+                  <p><strong>Futuro:</strong> vamos integrar com a Graph API.</p>
+                </div>
+              </div>
+              <Input label="Username do Instagram" placeholder="@seucanal" value={form.username}
+                onChange={e => setForm({ ...form, username: e.target.value })} />
+            </div>
+          )}
+
+          {/* ===== TWITTER ===== */}
+          {form.platform === 'twitter' && (
+            <div className="mb-4 space-y-3">
+              <div className="p-4 bg-info-muted/30 border border-info/10 rounded-xl">
+                <p className="text-xs font-semibold text-info mb-3 flex items-center gap-1.5">𝕏 Conectar Twitter/X</p>
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-surface-4 flex items-center justify-center text-[10px] font-bold text-content-2 flex-shrink-0 mt-0.5">1</div>
+                    <div>
+                      <p className="text-[11px] text-content-1 font-medium">Acesse developer.twitter.com</p>
+                      <a href="https://developer.twitter.com/en/portal/dashboard" target="_blank" className="text-[10px] text-accent-light hover:underline">developer.twitter.com ↗</a>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-surface-4 flex items-center justify-center text-[10px] font-bold text-content-2 flex-shrink-0 mt-0.5">2</div>
+                    <div>
+                      <p className="text-[11px] text-content-1 font-medium">Crie app → gere Bearer Token</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5">3</div>
+                    <div>
+                      <p className="text-[11px] text-content-1 font-medium">Cole o Bearer Token abaixo</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <Input label="Bearer Token" placeholder="AAAA..." value={form.access_token}
                 onChange={e => setForm({ ...form, access_token: e.target.value })} />
             </div>
-          </div>
+          )}
 
           {/* Auto publish */}
           <div className="mb-4">

@@ -1013,11 +1013,70 @@ async def verify_account(account_id: int):
                     checks["status"] = "error"
                     checks["message"] = f"Erro: {resp.status_code}"
 
-        elif account.platform in ("tiktok", "instagram", "youtube"):
-            # Essas plataformas precisam de OAuth flow
+        elif account.platform == "youtube":
+            api_key = account.api_key or account.access_token
+            async with httpx.AsyncClient(timeout=10) as client:
+                # Testa a API key com uma busca simples
+                resp = await client.get(
+                    "https://www.googleapis.com/youtube/v3/channels",
+                    params={"part": "snippet", "forHandle": account.username.lstrip("@") if account.username else "Google", "key": api_key},
+                )
+                if resp.status_code == 200:
+                    items = resp.json().get("items", [])
+                    if items:
+                        ch_name = items[0].get("snippet", {}).get("title", "")
+                        checks["status"] = "connected"
+                        checks["message"] = f"API Key valida! Canal encontrado: {ch_name}"
+                        checks["permissions"] = ["Ler dados do canal", "Buscar videos", "Ver estatisticas"]
+                    else:
+                        checks["status"] = "connected"
+                        checks["message"] = "API Key valida! Mas nenhum canal encontrado com esse username. Verifique o @username."
+                        checks["permissions"] = ["API Key funciona", "Ajuste o username do canal"]
+                elif resp.status_code == 400:
+                    error_detail = resp.json().get("error", {}).get("message", "")
+                    checks["status"] = "error"
+                    if "API key not valid" in error_detail or "invalid" in error_detail.lower():
+                        checks["message"] = "API Key invalida. Verifique se copiou corretamente."
+                        checks["permissions"] = [
+                            "Acesse console.cloud.google.com/apis/credentials",
+                            "Verifique se a key esta ativa (nao deletada)",
+                            "Verifique se YouTube Data API v3 esta ATIVADA no projeto",
+                            "Se criou a key agora, espere 1-2 minutos pra ativar",
+                        ]
+                    elif "API_KEY_HTTP_REFERRER_BLOCKED" in error_detail:
+                        checks["message"] = "API Key bloqueada por restricao de referrer."
+                        checks["permissions"] = [
+                            "Acesse console.cloud.google.com/apis/credentials",
+                            "Clique na sua API Key → Restricoes",
+                            "Em 'Restricoes de aplicativo' selecione 'Nenhum'",
+                            "Salve e espere 1-2 minutos",
+                        ]
+                    else:
+                        checks["message"] = f"Erro 400: {error_detail[:150]}"
+                        checks["permissions"] = [
+                            "Verifique se YouTube Data API v3 esta ativada",
+                            f"Detalhe: {error_detail[:200]}",
+                        ]
+                elif resp.status_code == 403:
+                    error_detail = resp.json().get("error", {}).get("message", "")
+                    checks["status"] = "error"
+                    checks["message"] = "API Key sem permissao. YouTube Data API v3 precisa estar ativada."
+                    checks["permissions"] = [
+                        "Acesse console.cloud.google.com/apis/library",
+                        "Busque 'YouTube Data API v3'",
+                        "Clique em ATIVAR",
+                        "Espere 2-3 minutos e tente novamente",
+                        f"Erro: {error_detail[:150]}",
+                    ]
+                else:
+                    checks["status"] = "error"
+                    checks["message"] = f"Erro HTTP {resp.status_code}"
+                    checks["permissions"] = [resp.text[:200]]
+
+        elif account.platform in ("tiktok", "instagram"):
             checks["status"] = "manual"
-            checks["message"] = f"Verificacao manual necessaria pra {account.platform}. Credenciais salvas."
-            checks["permissions"] = _get_platform_auth_guide(account.platform)
+            checks["message"] = f"Upload manual pra {account.platform}. Gere o video e baixe pra postar."
+            checks["permissions"] = ["Gerar video no Studio", "Baixar o arquivo MP4", f"Postar manualmente no {account.platform}"]
 
     except Exception as e:
         checks["status"] = "error"
