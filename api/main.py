@@ -15,7 +15,7 @@ from sqlalchemy import desc, func, select, update
 from config.logging import setup_logging
 from config.settings import settings
 from db.database import async_session, init_db
-from db.models import Clip, MonitoredSource, PublishAccount, PublishLog, PromptTemplate
+from db.models import Clip, ClipComment, MonitoredSource, PublishAccount, PublishLog, PromptTemplate
 from detection.trending import get_all_trends
 from pipeline import Pipeline
 from strategy.scheduler import get_analytics_summary
@@ -1168,3 +1168,90 @@ def _get_platform_auth_guide(platform: str) -> list[str]:
         ],
     }
     return guides.get(platform, ["Consulte documentacao da plataforma"])
+
+
+# ==================== CLIP COMMENTS ====================
+
+class CommentCreate(BaseModel):
+    text: str
+    type: str = "feedback"  # feedback, fix, note
+    author: str = "Pedro"
+
+
+@app.get("/api/clips/{clip_id}/comments")
+async def list_comments(clip_id: int):
+    async with async_session() as session:
+        result = await session.execute(
+            select(ClipComment).where(ClipComment.clip_id == clip_id).order_by(desc(ClipComment.created_at))
+        )
+        comments = result.scalars().all()
+    return {"comments": [
+        {"id": c.id, "text": c.text, "type": c.type, "author": c.author,
+         "resolved": c.resolved, "created_at": c.created_at.isoformat() if c.created_at else ""}
+        for c in comments
+    ]}
+
+
+@app.post("/api/clips/{clip_id}/comments")
+async def add_comment(clip_id: int, data: CommentCreate):
+    async with async_session() as session:
+        c = ClipComment(clip_id=clip_id, text=data.text, type=data.type, author=data.author)
+        session.add(c)
+        await session.commit()
+    return {"status": "created", "id": c.id}
+
+
+# ==================== CLONE + AUTO-FIX ====================
+
+class CloneRequest(BaseModel):
+    adjustments: str = ""  # Linguagem natural: "muda o tom pra mais urgente"
+
+
+@app.post("/api/clips/{clip_id}/clone")
+async def clone_clip(clip_id: int, data: CloneRequest):
+    """Clona um clip com ajustes em linguagem natural."""
+    async with async_session() as session:
+        original = await session.get(Clip, clip_id)
+        if not original:
+            raise HTTPException(404)
+
+    log.info("api.clips.clone", clip_id=clip_id, adjustments=data.adjustments[:100])
+
+    # Se tem ajustes, usa IA pra interpretar e modificar o texto
+    text = original.moment_text
+    if data.adjustments:
+        try:
+            from config.llm import llm_json
+            result = await llm_json(
+                system="Voce recebe um texto de noticia e um pedido de ajuste do usuario. Reescreva o texto aplicando o ajuste. Responda em JSON.",
+                user=f"""Texto original: {text}
+
+Ajuste pedido pelo usuario: {data.adjustments}
+
+Reescreva o texto aplicando o ajuste. Mantenha o mesmo fato/noticia, so mude o que o usuario pediu.
+
+JSON: {{"adjusted_text": "texto reescrito", "changes_made": "o que foi mudado"}}""",
+                temperature=0.4,
+                max_tokens=400,
+            )
+            text = result.get("adjusted_text", text)
+            changes = result.get("changes_made", "")
+            log.info("api.clips.clone.adjusted", changes=changes[:100])
+        except Exception as e:
+            log.warning("api.clips.clone.adjust_failed", error=str(e))
+
+    # Gera novo video com texto ajustado
+    from agents.graph import process_content
+    new_result = await process_content(
+        source_type="clone",
+        source_id=f"clone-{clip_id}-{int(dt.datetime.utcnow().timestamp())}",
+        source_url=original.source_url,
+        source_text=text,
+        source_author=f"Clone de #{clip_id}",
+    )
+
+    new_id = new_result.get("db_clip_id")
+    if new_id:
+        notify_sse("new_clip", {"clip_id": new_id})
+        return {"status": "ok", "new_clip_id": new_id, "adjustments_applied": data.adjustments}
+    return {"status": "error", "error": "Falha ao gerar clone"}

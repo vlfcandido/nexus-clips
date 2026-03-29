@@ -234,6 +234,20 @@ class Clip(Base):
     shares: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class ClipComment(Base):
+    """Comentários/feedback em clips — historico do que ficou bom/ruim."""
+
+    __tablename__ = "clip_comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
+    clip_id: Mapped[int] = mapped_column(Integer)
+    author: Mapped[str] = mapped_column(String(50), default="Pedro")
+    type: Mapped[str] = mapped_column(String(20), default="feedback")  # feedback, fix, note
+    text: Mapped[str] = mapped_column(Text)
+    resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class PublishAccount(Base):
     """Conta de rede social pra publicação."""
 

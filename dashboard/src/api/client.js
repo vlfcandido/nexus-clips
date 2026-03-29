@@ -21,6 +21,9 @@ export const getClips = (params = {}) => {
 export const publishClip = (id) => request(`/clips/${id}/publish`, { method: 'POST' })
 export const publishClipTo = (clipId, accountId) => request(`/clips/${clipId}/publish-to/${accountId}`, { method: 'POST' })
 export const generateClip = (data) => request('/clips/generate', { method: 'POST', body: JSON.stringify(data) })
+export const getClipComments = (id) => request(`/clips/${id}/comments`)
+export const addClipComment = (id, data) => request(`/clips/${id}/comments`, { method: 'POST', body: JSON.stringify(data) })
+export const cloneClip = (id, adjustments = '') => request(`/clips/${id}/clone`, { method: 'POST', body: JSON.stringify({ adjustments }) })
 export const deleteClip = (id) => request(`/clips/${id}`, { method: 'DELETE' })
 
 // Sources
