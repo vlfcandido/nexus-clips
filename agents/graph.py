@@ -189,6 +189,7 @@ async def process_content(
     source_media_url: str = "",
     source_author: str = "",
     source_topic_hints: list[str] | None = None,
+    studio_config: dict | None = None,
 ) -> ContentState:
     """Processa um conteúdo pelo pipeline LangGraph.
 
@@ -208,6 +209,7 @@ async def process_content(
     log.info("graph.process.start", uid=uid, source=source_type)
 
     # State inicial
+    cfg = studio_config or {}
     initial_state: ContentState = {
         "uid": uid,
         "source_type": source_type,
@@ -218,6 +220,10 @@ async def process_content(
         "source_author": source_author,
         "source_topic_hints": source_topic_hints or [],
         "messages": [],
+        # Studio config (usado pelo generate_video_node)
+        "voice_style": cfg.get("mood", "narrador"),
+        "use_voice": True,
+        "duration_target": cfg.get("duration", 30),
     }
 
     # CONCEITO LANGGRAPH: ainvoke() roda todo o grafo de forma assíncrona

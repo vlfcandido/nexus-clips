@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { Film, Upload, Trash2, ExternalLink, Eye, Clock, Play, X, Copy, Send, Maximize2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Film, Upload, Trash2, ExternalLink, Eye, Clock, Play, X, Copy, Send, Maximize2, Loader2, Check } from 'lucide-react'
 import { useApp } from '../context/AppContext'
-import { publishClip, deleteClip } from '../api/client'
+import { publishClip, deleteClip, publishClipTo, getAccounts } from '../api/client'
 import Button from './ui/Button'
 import Badge from './ui/Badge'
 import EmptyState from './ui/EmptyState'
@@ -17,6 +17,24 @@ const CAT_EMOJI = {
 
 function ClipDetailModal({ clip, onClose, onPublish }) {
   const [fullscreen, setFullscreen] = useState(false)
+  const [accounts, setAccounts] = useState([])
+  const [showAccounts, setShowAccounts] = useState(false)
+  const [publishing, setPublishing] = useState(null)
+  const [publishResult, setPublishResult] = useState(null)
+
+  useEffect(() => { getAccounts().then(d => setAccounts(d.accounts)).catch(() => {}) }, [])
+
+  async function handlePublishTo(accountId) {
+    setPublishing(accountId)
+    setPublishResult(null)
+    try {
+      const res = await publishClipTo(clip.id, accountId)
+      setPublishResult(res)
+      if (res.status === 'published') onPublish(clip.id)
+    } catch (e) { setPublishResult({ status: 'error', error: e.message }) }
+    setPublishing(null)
+  }
+
   if (!clip) return null
 
   if (fullscreen) {
@@ -84,10 +102,49 @@ function ClipDetailModal({ clip, onClose, onPublish }) {
                 </div>
               </div>
             )}
-            <div className="flex flex-wrap gap-2 pt-3 border-t border-stroke-1">
-              {!clip.published && <Button icon={Send} onClick={() => onPublish(clip.id)}>Publicar</Button>}
-              <Button variant="secondary" icon={Copy} onClick={() => navigator.clipboard.writeText(clip.caption || clip.moment_text)}>Copiar texto</Button>
-              {clip.source_url && <a href={clip.source_url} target="_blank"><Button variant="ghost" icon={ExternalLink}>Fonte</Button></a>}
+            <div className="pt-3 border-t border-stroke-1 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {!clip.published && (
+                  <Button icon={Send} onClick={() => setShowAccounts(!showAccounts)}>
+                    {showAccounts ? 'Fechar' : 'Publicar em...'}
+                  </Button>
+                )}
+                <Button variant="secondary" icon={Copy} onClick={() => navigator.clipboard.writeText(clip.caption || clip.moment_text)}>Copiar texto</Button>
+                {clip.clip_path && (
+                  <a href={clip.clip_path} download><Button variant="secondary" icon={ExternalLink}>Baixar video</Button></a>
+                )}
+              </div>
+
+              {showAccounts && (
+                <div className="space-y-1.5 animate-in-fast">
+                  <p className="text-[10px] text-content-4 uppercase tracking-wider">Escolha a conta:</p>
+                  {accounts.filter(a => a.active).map(acc => {
+                    const emoji = { tiktok: '🎵', instagram: '📸', youtube: '▶️', twitter: '𝕏', telegram: '✈️' }
+                    return (
+                      <button key={acc.id} onClick={() => handlePublishTo(acc.id)}
+                        className="w-full flex items-center gap-3 p-2.5 rounded-lg bg-surface-3/50 hover:bg-surface-3 border border-stroke-1 hover:border-stroke-2 transition-all text-left">
+                        <span className="text-base">{emoji[acc.platform] || '📱'}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-content-1">{acc.name}</p>
+                          <p className="text-[10px] text-content-4">{acc.platform} · {acc.username}</p>
+                        </div>
+                        {publishing === acc.id && <Loader2 className="w-4 h-4 text-accent-light animate-spin" />}
+                        {!acc.has_credentials && <Badge variant="warning">Sem token</Badge>}
+                        {acc.has_credentials && <Badge variant="success" dot>Pronta</Badge>}
+                      </button>
+                    )
+                  })}
+                  {accounts.filter(a => a.active).length === 0 && (
+                    <p className="text-xs text-content-4 py-2">Nenhuma conta ativa. Va em Contas pra configurar.</p>
+                  )}
+                </div>
+              )}
+
+              {publishResult && (
+                <div className={`p-2.5 rounded-lg text-xs ${publishResult.status === 'published' ? 'bg-success-muted text-success' : 'bg-danger-muted text-danger'}`}>
+                  {publishResult.status === 'published' ? <span className="flex items-center gap-1"><Check className="w-3 h-3" /> Publicado com sucesso!</span> : publishResult.error}
+                </div>
+              )}
             </div>
           </div>
         </div>

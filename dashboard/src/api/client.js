@@ -19,6 +19,7 @@ export const getClips = (params = {}) => {
   return request(`/clips${qs ? `?${qs}` : ''}`)
 }
 export const publishClip = (id) => request(`/clips/${id}/publish`, { method: 'POST' })
+export const publishClipTo = (clipId, accountId) => request(`/clips/${clipId}/publish-to/${accountId}`, { method: 'POST' })
 export const generateClip = (data) => request('/clips/generate', { method: 'POST', body: JSON.stringify(data) })
 export const deleteClip = (id) => request(`/clips/${id}`, { method: 'DELETE' })
 

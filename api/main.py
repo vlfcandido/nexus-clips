@@ -176,16 +176,22 @@ async def list_clips(
 
 
 class ManualClipCreate(BaseModel):
-    text: str  # Texto/notícia que Pedro quer transformar em vídeo
-    topic: str = "guerra"  # guerra, futebol, política, entretenimento
+    text: str
+    topic: str = "guerra"
     voice: str = "pt-BR-AntonioNeural"
     source: str = "Manual"
+    mood: str = "urgente"
+    visual_style: str = "news"
+    subtitle_style: str = "word_by_word"
+    duration: int = 30
+    platform: str = "tiktok"
+    extra_instructions: str = ""
 
 
 @app.post("/api/clips/generate")
 async def generate_clip_manual(data: ManualClipCreate):
-    """Gera um clip manualmente — Pedro escolhe o texto e as opções."""
-    log.info("api.clips.generate_manual", topic=data.topic, chars=len(data.text))
+    """Gera um clip manualmente com todas as opções do Studio."""
+    log.info("api.clips.generate_manual", topic=data.topic, mood=data.mood, style=data.visual_style)
 
     from agents.graph import process_content
 
@@ -196,6 +202,16 @@ async def generate_clip_manual(data: ManualClipCreate):
             source_url="",
             source_text=data.text,
             source_author=data.source,
+            # Campos do Studio — passados pro pipeline
+            studio_config={
+                "voice": data.voice,
+                "mood": data.mood,
+                "visual_style": data.visual_style,
+                "subtitle_style": data.subtitle_style,
+                "duration": data.duration,
+                "platform": data.platform,
+                "extra_instructions": data.extra_instructions,
+            },
         )
 
         clip_id = result.get("db_clip_id")
@@ -236,6 +252,89 @@ async def publish_clip(clip_id: int):
         await session.commit()
 
     return {"status": "published", "clip_id": clip_id}
+
+
+@app.post("/api/clips/{clip_id}/publish-to/{account_id}")
+async def publish_clip_to_account(clip_id: int, account_id: int):
+    """Publica clip em conta específica (Telegram, etc)."""
+    log.info("api.clips.publish_to", clip_id=clip_id, account_id=account_id)
+
+    async with async_session() as session:
+        clip = await session.get(Clip, clip_id)
+        if not clip:
+            raise HTTPException(404, "Clip nao encontrado")
+        account = await session.get(PublishAccount, account_id)
+        if not account:
+            raise HTTPException(404, "Conta nao encontrada")
+
+    result_url = ""
+    error_msg = ""
+
+    try:
+        if account.platform == "telegram" and account.access_token:
+            import httpx
+            # Monta caption
+            caption = f"<b>{clip.caption}</b>\n\n{clip.hashtags}" if clip.caption else clip.moment_text
+
+            # Envia vídeo se tiver, senão texto
+            video_full_path = ""
+            if clip.clip_path:
+                from pathlib import Path
+                video_full_path = str(settings.clips_output_dir / clip.clip_path.lstrip("/media/"))
+
+            async with httpx.AsyncClient(timeout=60) as client:
+                if video_full_path and Path(video_full_path).exists():
+                    with open(video_full_path, "rb") as vf:
+                        resp = await client.post(
+                            f"https://api.telegram.org/bot{account.access_token}/sendVideo",
+                            data={"chat_id": account.username, "caption": caption[:1024], "parse_mode": "HTML"},
+                            files={"video": ("clip.mp4", vf, "video/mp4")},
+                        )
+                else:
+                    resp = await client.post(
+                        f"https://api.telegram.org/bot{account.access_token}/sendMessage",
+                        json={"chat_id": account.username, "text": caption[:4096], "parse_mode": "HTML"},
+                    )
+
+                if resp.status_code == 200 and resp.json().get("ok"):
+                    msg = resp.json()["result"]
+                    result_url = f"telegram://msg/{msg.get('message_id', '')}"
+                    log.info("publish.telegram.ok", clip_id=clip_id, msg_id=msg.get("message_id"))
+                else:
+                    error_msg = resp.json().get("description", f"HTTP {resp.status_code}")
+                    log.error("publish.telegram.fail", error=error_msg)
+
+        else:
+            error_msg = f"Publicacao automatica em {account.platform} ainda nao implementada. Exporte o video e poste manualmente."
+
+    except Exception as e:
+        error_msg = str(e)
+        log.error("publish.error", error=error_msg)
+
+    # Salva log
+    async with async_session() as session:
+        pub_log = PublishLog(
+            clip_id=clip_id,
+            account_id=account_id,
+            platform=account.platform,
+            post_url=result_url,
+            status="published" if result_url else "failed",
+            published_at=dt.datetime.utcnow() if result_url else None,
+            error=error_msg,
+        )
+        session.add(pub_log)
+
+        if result_url:
+            clip_obj = await session.get(Clip, clip_id)
+            if clip_obj:
+                clip_obj.published = True
+                clip_obj.published_at = dt.datetime.utcnow()
+
+        await session.commit()
+
+    if error_msg:
+        return {"status": "error", "error": error_msg}
+    return {"status": "published", "url": result_url, "platform": account.platform}
 
 
 @app.delete("/api/clips/{clip_id}")

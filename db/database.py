@@ -21,14 +21,29 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Seed prompts padrão (só insere se não existir)
+    # Seed prompts padrão
     from sqlalchemy import select
     async with async_session() as session:
         existing = await session.execute(select(PromptTemplate.key))
         existing_keys = {r[0] for r in existing.all()}
-
         for p in DEFAULT_PROMPTS:
             if p["key"] not in existing_keys:
                 session.add(PromptTemplate(**p))
+        await session.commit()
 
+    # Seed fontes padrão
+    from db.models import MonitoredSource
+    async with async_session() as session:
+        existing = await session.execute(select(MonitoredSource.identifier))
+        existing_ids = {r[0] for r in existing.all()}
+
+        default_sources = [
+            {"source_type": "rss", "identifier": "https://feeds.bbci.co.uk/portuguese/rss.xml", "topic": "guerra"},
+            {"source_type": "rss", "identifier": "https://g1.globo.com/rss/g1/", "topic": "guerra"},
+            {"source_type": "rss", "identifier": "https://ge.globo.com/rss/futebol/", "topic": "futebol"},
+            {"source_type": "rss", "identifier": "https://rss.uol.com.br/feed/noticias.xml", "topic": "política"},
+        ]
+        for s in default_sources:
+            if s["identifier"] not in existing_ids:
+                session.add(MonitoredSource(**s))
         await session.commit()
