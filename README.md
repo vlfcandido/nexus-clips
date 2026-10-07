@@ -108,3 +108,9 @@ cd dashboard && npm run dev  # Frontend em http://localhost:5173
 - [ ] Deploy GCP
 - [ ] Copa do Mundo 2026
 - [ ] Eleicoes 2026
+
+## Status
+
+Scaffold completo (backend FastAPI + pipeline LangGraph + dashboard React), em
+evolucao. Pipeline end-to-end e uploads automaticos ainda em andamento (ver Roadmap).
+Projeto pessoal, sem suite de testes automatizada ainda.
