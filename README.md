@@ -25,6 +25,12 @@ Agente autonomo de IA que monitora fontes em tempo real, detecta momentos virais
 
 ## Arquitetura
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/marca/diagrama-escuro.svg">
+  <img alt="Diagrama: fontes, classificação com aresta condicional, estratégia, legenda, crescimento e canais em paralelo, geração do vídeo e fila de publicação" src="docs/marca/diagrama-claro.svg" width="100%">
+</picture>
+
+
 ```
 Sources (Twitter, YouTube, RSS)
          |
