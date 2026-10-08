@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/marca/cabecalho-escuro.svg">
+  <img alt="Nexus Clips" src="docs/marca/cabecalho-claro.svg" width="100%">
+</picture>
+
 # Nexus Clips
 
 Agente autonomo de IA que monitora fontes em tempo real, detecta momentos virais e gera cortes/videos automaticamente para TikTok, Reels, Shorts e X.
