@@ -2,6 +2,10 @@
 
 Agente autonomo de IA que monitora fontes em tempo real, detecta momentos virais e gera cortes/videos automaticamente para TikTok, Reels, Shorts e X.
 
+![Painel do Nexus Clips rodando com dados fictícios](docs/prints/nexus-clips.png)
+
+<sub>Front real do painel, servido com uma API local de dados fictícios.</sub>
+
 ## Stack
 
 - **Backend**: Python 3.12+ / FastAPI / Pydantic v2 / SQLAlchemy async
